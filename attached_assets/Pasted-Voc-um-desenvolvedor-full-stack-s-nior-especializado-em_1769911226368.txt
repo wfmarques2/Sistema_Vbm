@@ -1,0 +1,103 @@
+Você é um desenvolvedor full stack sênior especializado em aplicações WEB administrativas.
+
+Crie uma APLICAÇÃO WEB INTERNA, acessada EXCLUSIVAMENTE via navegador (desktop e mobile),
+sem aplicativo nativo, sem PWA e sem app mobile.
+
+🎯 Objetivo:
+Centralizar e organizar toda a operação interna de uma empresa de transfer executivo,
+utilizando um painel administrativo web simples, rápido e profissional.
+
+📌 Características obrigatórias:
+- Aplicação WEB (HTML/CSS/JS)
+- Acesso via navegador
+- Layout responsivo (desktop e tablet)
+- Interface administrativa (dashboard)
+- Uso interno apenas
+
+🧩 Módulos obrigatórios:
+
+1️⃣ Dashboard
+- Serviços do dia
+- Próximos serviços agendados
+- Motoristas ativos
+- Veículos disponíveis / em uso
+- Faturamento estimado do período
+
+2️⃣ Gestão de Serviços (módulo principal)
+Cada serviço deve conter:
+- Data e horário
+- Origem e destino
+- Tipo de serviço (aeroporto, corporativo, city tour, por hora)
+- Cliente (nome e telefone)
+- Motorista designado
+- Veículo designado
+- Valor do serviço
+- Forma de pagamento (PIX, dinheiro, faturado)
+- Status (Agendado, Em andamento, Finalizado, Cancelado)
+- Observações internas
+
+Funcionalidades:
+- Criar, editar, listar e cancelar serviços
+- Filtro por data, status e motorista
+
+3️⃣ Cadastro de Motoristas
+- Nome
+- Telefone
+- Tipo de vínculo (fixo ou freelancer)
+- Validade da CNH
+- Observações internas
+- Histórico de serviços
+
+4️⃣ Cadastro de Veículos
+- Modelo
+- Placa
+- Capacidade
+- Status (disponível, em uso, manutenção)
+- Observações
+
+5️⃣ Agenda Operacional
+- Visualização diária
+- Serviços organizados por horário
+- Indicação clara de motorista e veículo
+
+6️⃣ Financeiro Básico (interno)
+- Registro de valores por serviço
+- Status de pagamento (pendente / pago)
+- Relatório simples por período
+
+7️⃣ Relatórios
+- Serviços por período
+- Faturamento mensal
+- Serviços por motorista
+- Exportação em CSV
+
+🔐 Segurança:
+- Autenticação por login e senha
+- Perfis de acesso (admin e operacional)
+- Restrição de acesso ao módulo financeiro
+- Logs básicos de ações
+
+🛠️ Stack sugerida:
+- Frontend: React ou Next.js
+- Backend: Node.js ou Laravel
+- Banco de dados: MySQL
+- API REST
+- Autenticação baseada em sessão ou JWT
+
+📦 Entrega esperada:
+- Estrutura completa da aplicação web
+- Modelagem do banco de dados (SQL)
+- Endpoints da API
+- Telas principais do painel administrativo
+- Código organizado, comentado e pronto para produção
+
+🚫 NÃO incluir:
+- Aplicativo mobile
+- PWA
+- App para clientes
+- App para motoristas
+- Rastreamento em tempo real
+- Integração com pagamento ou nota fiscal
+
+Priorize simplicidade, desempenho, organização e facilidade de uso no dia a dia.
+Explique brevemente as decisões técnicas adotadas.
