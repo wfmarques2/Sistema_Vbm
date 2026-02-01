@@ -1,0 +1,209 @@
+import { Layout } from "@/components/layout";
+import { useVehicles, useCreateVehicle, useUpdateVehicle, useDeleteVehicle } from "@/hooks/use-vehicles";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertVehicleSchema, vehicleStatusEnum } from "@shared/schema";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+export default function VehiclesPage() {
+  const { data: vehicles, isLoading } = useVehicles();
+  const createMutation = useCreateVehicle();
+  const updateMutation = useUpdateVehicle();
+  const deleteMutation = useDeleteVehicle();
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  const form = useForm({
+    resolver: zodResolver(insertVehicleSchema),
+    defaultValues: {
+      model: "",
+      plate: "",
+      capacity: 4,
+      status: "available",
+      notes: ""
+    }
+  });
+
+  const onSubmit = async (values: any) => {
+    // Ensure capacity is a number
+    const payload = {
+        ...values,
+        capacity: parseInt(values.capacity),
+    };
+
+    if (editingId) {
+      await updateMutation.mutateAsync({ id: editingId, ...payload });
+    } else {
+      await createMutation.mutateAsync(payload);
+    }
+    setIsDialogOpen(false);
+    setEditingId(null);
+    form.reset();
+  };
+
+  const handleEdit = (vehicle: any) => {
+    setEditingId(vehicle.id);
+    form.reset({
+        ...vehicle,
+        capacity: vehicle.capacity.toString() // Needed for some inputs if using string logic
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm("Are you sure you want to delete this vehicle?")) {
+      await deleteMutation.mutateAsync(id);
+    }
+  };
+
+  return (
+    <Layout>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h2 className="text-3xl font-display font-bold text-primary">Vehicles</h2>
+          <p className="text-muted-foreground">Manage your fleet inventory.</p>
+        </div>
+        
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => { setEditingId(null); form.reset(); }} className="bg-primary shadow-lg hover:shadow-primary/30">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Vehicle
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingId ? "Edit Vehicle" : "Add Vehicle"}</DialogTitle>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="model"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Model</FormLabel>
+                      <FormControl><Input placeholder="e.g. Mercedes Benz C-Class" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="plate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>License Plate</FormLabel>
+                        <FormControl><Input placeholder="ABC-1234" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="capacity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Capacity</FormLabel>
+                        <FormControl><Input type="number" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {vehicleStatusEnum.map(s => <SelectItem key={s} value={s}>{s.replace('_', ' ')}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+                  {editingId ? "Update Vehicle" : "Create Vehicle"}
+                </Button>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="bg-card rounded-xl shadow-sm border border-border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Model</TableHead>
+              <TableHead>Plate</TableHead>
+              <TableHead>Capacity</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+               <TableRow><TableCell colSpan={5} className="text-center py-8">Loading vehicles...</TableCell></TableRow>
+            ) : vehicles?.length === 0 ? (
+              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No vehicles found.</TableCell></TableRow>
+            ) : (
+              vehicles?.map((vehicle) => (
+                <TableRow key={vehicle.id} className="group hover:bg-muted/30 transition-colors">
+                  <TableCell className="font-medium">{vehicle.model}</TableCell>
+                  <TableCell className="font-mono text-xs">{vehicle.plate}</TableCell>
+                  <TableCell>{vehicle.capacity} pax</TableCell>
+                  <TableCell>
+                     {vehicle.status === "available" && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200">Available</Badge>}
+                     {vehicle.status === "in_use" && <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">In Use</Badge>}
+                     {vehicle.status === "maintenance" && <Badge variant="destructive">Maintenance</Badge>}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(vehicle)}>
+                        <Pencil className="w-4 h-4 text-blue-600" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(vehicle.id)}>
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </Layout>
+  );
+}
