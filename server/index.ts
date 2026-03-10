@@ -1,7 +1,12 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+import rateLimit from "express-rate-limit";
+import { pool } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
@@ -12,6 +17,8 @@ declare module "http" {
   }
 }
 
+// Sessions will be initialized after ensuring table (inside async IIFE)
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {
@@ -21,6 +28,16 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// Rate limits for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/forgot", authLimiter);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -40,7 +57,9 @@ app.use((req, res, next) => {
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
+    if (process.env.LOG_BODY === "true") {
+      capturedJsonResponse = bodyJson;
+    }
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
@@ -60,7 +79,42 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Ensure session table/index exist once
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "session" (
+      "sid" varchar PRIMARY KEY,
+      "sess" json NOT NULL,
+      "expire" timestamp(6) NOT NULL
+    );
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+  `);
+
+  // Sessions (Postgres store)
+  const PgStore = connectPg(session);
+  app.use(
+    session({
+      store: new PgStore({ pool, tableName: "session", createTableIfMissing: false }),
+      secret: process.env.SESSION_SECRET || Math.random().toString(36).slice(2),
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      },
+      name: "sid",
+    }),
+  );
+
   await registerRoutes(httpServer, app);
+
+  // Healthcheck
+  app.get("/api/health", (_req, res) => {
+    res.json({ ok: true, uptime: process.uptime() });
+  });
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -90,11 +144,11 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
+  const host = process.env.HOST || "127.0.0.1";
   httpServer.listen(
     {
       port,
-      host: "0.0.0.0",
-      reusePort: true,
+      host,
     },
     () => {
       log(`serving on port ${port}`);

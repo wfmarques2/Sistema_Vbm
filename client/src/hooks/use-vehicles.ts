@@ -8,7 +8,7 @@ export function useVehicles() {
     queryKey: [api.vehicles.list.path],
     queryFn: async () => {
       const res = await fetch(api.vehicles.list.path, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch vehicles");
+      if (!res.ok) throw new Error("Falha ao carregar veículos");
       return api.vehicles.list.responses[200].parse(await res.json());
     },
   });
@@ -27,15 +27,15 @@ export function useCreateVehicle() {
         body: JSON.stringify(validated),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to create vehicle");
+      if (!res.ok) throw new Error("Falha ao criar veículo");
       return api.vehicles.create.responses[201].parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.vehicles.list.path] });
-      toast({ title: "Success", description: "Vehicle created successfully" });
+      toast({ title: "Sucesso", description: "Veículo criado com sucesso" });
     },
     onError: (error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 }
@@ -54,15 +54,15 @@ export function useUpdateVehicle() {
         body: JSON.stringify(validated),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to update vehicle");
+      if (!res.ok) throw new Error("Falha ao atualizar veículo");
       return api.vehicles.update.responses[200].parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.vehicles.list.path] });
-      toast({ title: "Success", description: "Vehicle updated successfully" });
+      toast({ title: "Sucesso", description: "Veículo atualizado com sucesso" });
     },
     onError: (error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 }
@@ -75,14 +75,14 @@ export function useDeleteVehicle() {
     mutationFn: async (id: number) => {
       const url = buildUrl(api.vehicles.delete.path, { id });
       const res = await fetch(url, { method: api.vehicles.delete.method, credentials: "include" });
-      if (!res.ok) throw new Error("Failed to delete vehicle");
+      if (!res.ok) throw new Error("Falha ao excluir veículo");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.vehicles.list.path] });
-      toast({ title: "Success", description: "Vehicle deleted successfully" });
+      toast({ title: "Sucesso", description: "Veículo excluído com sucesso" });
     },
     onError: (error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 }

@@ -26,6 +26,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function DriversPage() {
   const { data: drivers, isLoading } = useDrivers();
@@ -35,18 +36,30 @@ export default function DriversPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [initializedFromQuery, setInitializedFromQuery] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(insertDriverSchema),
     defaultValues: {
       name: "",
       phone: "",
+      email: "",
       type: "fixed",
       licenseValidity: new Date().toISOString().split('T')[0],
       notes: "",
       active: true,
     }
   });
+
+  if (!initializedFromQuery) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new")) {
+      setEditingId(null);
+      form.reset();
+      setIsDialogOpen(true);
+    }
+    setInitializedFromQuery(true);
+  }
 
   const onSubmit = async (values: any) => {
     if (editingId) {
@@ -63,13 +76,14 @@ export default function DriversPage() {
     setEditingId(driver.id);
     form.reset({
       ...driver,
+      email: driver.email || "",
       licenseValidity: driver.licenseValidity ? new Date(driver.licenseValidity).toISOString().split('T')[0] : "",
     });
     setIsDialogOpen(true);
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm("Are you sure you want to delete this driver?")) {
+    if (confirm("Tem certeza que deseja excluir este motorista?")) {
       await deleteMutation.mutateAsync(id);
     }
   };
@@ -78,20 +92,20 @@ export default function DriversPage() {
     <Layout>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Drivers</h2>
-          <p className="text-muted-foreground">Manage your fleet personnel.</p>
+          <h2 className="text-3xl font-display font-bold text-primary">Motoristas</h2>
+          <p className="text-muted-foreground">Gerencie a equipe de motoristas.</p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => { setEditingId(null); form.reset(); }} className="bg-primary shadow-lg hover:shadow-primary/30">
               <Plus className="w-4 h-4 mr-2" />
-              Add Driver
+              Adicionar Motorista
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingId ? "Edit Driver" : "Add Driver"}</DialogTitle>
+              <DialogTitle>{editingId ? "Editar Motorista" : "Adicionar Motorista"}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -100,7 +114,7 @@ export default function DriversPage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Full Name</FormLabel>
+                      <FormLabel>Nome Completo</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -111,8 +125,19 @@ export default function DriversPage() {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
+                      <FormLabel>Telefone</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>E-mail (login do motorista)</FormLabel>
+                      <FormControl><Input type="email" placeholder="email@exemplo.com" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -123,13 +148,17 @@ export default function DriversPage() {
                     name="type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Type</FormLabel>
+                        <FormLabel>Vínculo</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                            <SelectTrigger><SelectValue placeholder="Selecione o vínculo" /></SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {driverTypeEnum.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                            {driverTypeEnum.map(t => (
+                              <SelectItem key={t} value={t}>
+                                {t === "fixed" ? "Fixo" : t === "freelance" ? "Autônomo" : t}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -141,7 +170,7 @@ export default function DriversPage() {
                     name="licenseValidity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>CNH Validity</FormLabel>
+                        <FormLabel>Validade da CNH</FormLabel>
                         <FormControl><Input type="date" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
@@ -149,7 +178,7 @@ export default function DriversPage() {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {editingId ? "Update Driver" : "Create Driver"}
+                  {editingId ? "Atualizar Motorista" : "Criar Motorista"}
                 </Button>
               </form>
             </Form>
@@ -161,19 +190,20 @@ export default function DriversPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>License Exp.</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Contato</TableHead>
+              <TableHead>E-mail</TableHead>
+              <TableHead>Vínculo</TableHead>
+              <TableHead>Validade CNH</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-               <TableRow><TableCell colSpan={6} className="text-center py-8">Loading drivers...</TableCell></TableRow>
+               <TableRow><TableCell colSpan={7} className="text-center py-8">Carregando motoristas...</TableCell></TableRow>
             ) : drivers?.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No drivers found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum motorista encontrado.</TableCell></TableRow>
             ) : (
               drivers?.map((driver) => (
                 <TableRow key={driver.id} className="group hover:bg-muted/30 transition-colors">
@@ -184,18 +214,21 @@ export default function DriversPage() {
                       {driver.phone}
                     </div>
                   </TableCell>
-                  <TableCell className="capitalize">{driver.type}</TableCell>
+                  <TableCell className="text-sm">{driver.email || "—"}</TableCell>
+                  <TableCell className="capitalize">
+                    {driver.type === "fixed" ? "Fixo" : driver.type === "freelance" ? "Autônomo" : "—"}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center text-sm">
                       <Calendar className="w-3 h-3 mr-1" />
-                      {format(new Date(driver.licenseValidity), 'MMM dd, yyyy')}
+                      {format(new Date(driver.licenseValidity), 'dd/MM/yyyy', { locale: ptBR })}
                     </div>
                   </TableCell>
                   <TableCell>
                     {driver.active ? (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800">Active</Badge>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">Ativo</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-muted-foreground">Inactive</Badge>
+                      <Badge variant="outline" className="text-muted-foreground">Inativo</Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right">

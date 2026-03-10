@@ -21,7 +21,7 @@ import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertVehicleSchema, vehicleStatusEnum } from "@shared/schema";
+import { insertVehicleSchema, vehicleStatusEnum, vehicleTypeEnum } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,9 +31,19 @@ export default function VehiclesPage() {
   const createMutation = useCreateVehicle();
   const updateMutation = useUpdateVehicle();
   const deleteMutation = useDeleteVehicle();
+  const labelFromType = (t?: string) =>
+    t === "sedan" ? "Sedan" :
+    t === "suv" ? "SUV" :
+    t === "minivan" ? "Minivan" :
+    t === "van" ? "Van" :
+    t === "micro_onibus" ? "Micro-ônibus" :
+    t === "onibus" ? "Ônibus" :
+    t === "blindado" ? "Blindado" :
+    "—";
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [initializedFromQuery, setInitializedFromQuery] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(insertVehicleSchema),
@@ -41,10 +51,21 @@ export default function VehiclesPage() {
       model: "",
       plate: "",
       capacity: 4,
+      type: "sedan",
       status: "available",
       notes: ""
     }
   });
+
+  if (!initializedFromQuery) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new")) {
+      setEditingId(null);
+      form.reset();
+      setIsDialogOpen(true);
+    }
+    setInitializedFromQuery(true);
+  }
 
   const onSubmit = async (values: any) => {
     // Ensure capacity is a number
@@ -67,13 +88,14 @@ export default function VehiclesPage() {
     setEditingId(vehicle.id);
     form.reset({
         ...vehicle,
-        capacity: vehicle.capacity.toString() // Needed for some inputs if using string logic
+        capacity: vehicle.capacity.toString(), // numeric input string
+        type: vehicle.type || "sedan",
     });
     setIsDialogOpen(true);
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm("Are you sure you want to delete this vehicle?")) {
+    if (confirm("Tem certeza que deseja excluir este veículo?")) {
       await deleteMutation.mutateAsync(id);
     }
   };
@@ -82,20 +104,20 @@ export default function VehiclesPage() {
     <Layout>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Vehicles</h2>
-          <p className="text-muted-foreground">Manage your fleet inventory.</p>
+          <h2 className="text-3xl font-display font-bold text-primary">Veículos</h2>
+          <p className="text-muted-foreground">Gerencie sua frota.</p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => { setEditingId(null); form.reset(); }} className="bg-primary shadow-lg hover:shadow-primary/30">
               <Plus className="w-4 h-4 mr-2" />
-              Add Vehicle
+              Adicionar Veículo
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingId ? "Edit Vehicle" : "Add Vehicle"}</DialogTitle>
+              <DialogTitle>{editingId ? "Editar Veículo" : "Adicionar Veículo"}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -104,8 +126,8 @@ export default function VehiclesPage() {
                   name="model"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Model</FormLabel>
-                      <FormControl><Input placeholder="e.g. Mercedes Benz C-Class" {...field} /></FormControl>
+                      <FormLabel>Modelo</FormLabel>
+                      <FormControl><Input placeholder="ex.: Mercedes Benz Classe C" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -116,7 +138,7 @@ export default function VehiclesPage() {
                     name="plate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>License Plate</FormLabel>
+                      <FormLabel>Placa</FormLabel>
                         <FormControl><Input placeholder="ABC-1234" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
@@ -127,7 +149,7 @@ export default function VehiclesPage() {
                     name="capacity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Capacity</FormLabel>
+                      <FormLabel>Capacidade</FormLabel>
                         <FormControl><Input type="number" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
@@ -136,16 +158,48 @@ export default function VehiclesPage() {
                 </div>
                 <FormField
                   control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {vehicleTypeEnum.map(t => (
+                            <SelectItem key={t} value={t}>
+                              {t === "sedan" ? "Sedan" :
+                               t === "suv" ? "SUV" :
+                               t === "minivan" ? "Minivan" :
+                               t === "van" ? "Van" :
+                               t === "micro_onibus" ? "Micro-ônibus" :
+                               t === "onibus" ? "Ônibus" :
+                               t === "blindado" ? "Blindado" : t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="status"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Status</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {vehicleStatusEnum.map(s => <SelectItem key={s} value={s}>{s.replace('_', ' ')}</SelectItem>)}
+                          {vehicleStatusEnum.map(s => (
+                            <SelectItem key={s} value={s}>
+                              {s === "available" ? "Disponível" : s === "in_use" ? "Em uso" : s === "maintenance" ? "Manutenção" : s}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -153,7 +207,7 @@ export default function VehiclesPage() {
                   )}
                 />
                 <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {editingId ? "Update Vehicle" : "Create Vehicle"}
+                  {editingId ? "Atualizar Veículo" : "Criar Veículo"}
                 </Button>
               </form>
             </Form>
@@ -165,18 +219,19 @@ export default function VehiclesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Model</TableHead>
-              <TableHead>Plate</TableHead>
-              <TableHead>Capacity</TableHead>
+              <TableHead>Modelo</TableHead>
+              <TableHead>Placa</TableHead>
+              <TableHead>Capacidade</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-               <TableRow><TableCell colSpan={5} className="text-center py-8">Loading vehicles...</TableCell></TableRow>
+               <TableRow><TableCell colSpan={6} className="text-center py-8">Carregando veículos...</TableCell></TableRow>
             ) : vehicles?.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No vehicles found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum veículo encontrado.</TableCell></TableRow>
             ) : (
               vehicles?.map((vehicle) => (
                 <TableRow key={vehicle.id} className="group hover:bg-muted/30 transition-colors">
@@ -184,9 +239,12 @@ export default function VehiclesPage() {
                   <TableCell className="font-mono text-xs">{vehicle.plate}</TableCell>
                   <TableCell>{vehicle.capacity} pax</TableCell>
                   <TableCell>
-                     {vehicle.status === "available" && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200">Available</Badge>}
-                     {vehicle.status === "in_use" && <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">In Use</Badge>}
-                     {vehicle.status === "maintenance" && <Badge variant="destructive">Maintenance</Badge>}
+                    {labelFromType(vehicle.type)}
+                  </TableCell>
+                  <TableCell>
+                     {vehicle.status === "available" && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200">Disponível</Badge>}
+                     {vehicle.status === "in_use" && <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">Em uso</Badge>}
+                     {vehicle.status === "maintenance" && <Badge variant="destructive">Manutenção</Badge>}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

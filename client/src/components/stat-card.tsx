@@ -25,7 +25,7 @@ export function StatCard({ title, value, icon: Icon, trend, trendUp }: StatCardP
         {trend && (
           <div className={`text-xs mt-4 font-medium flex items-center gap-1 ${trendUp ? "text-emerald-600" : "text-rose-600"}`}>
             <span>{trend}</span>
-            <span className="text-muted-foreground">vs last month</span>
+            <span className="text-muted-foreground">vs mês passado</span>
           </div>
         )}
       </CardContent>

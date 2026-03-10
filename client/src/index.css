@@ -5,37 +5,37 @@
 @tailwind utilities;
 
 :root {
-  /* Elegant Professional Palette - Deep Navy, Slate, and Clean White */
-  --background: 210 20% 98%;
-  --foreground: 222 47% 11%;
+  /* Paleta VBM: ouro premium sobre fundo claro, combinando com o logo */
+  --background: 36 33% 98%;
+  --foreground: 230 15% 10%;
 
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card-foreground: 230 15% 10%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
+  --popover-foreground: 230 15% 10%;
 
-  /* Executive Navy Blue */
-  --primary: 222 47% 31%;
+  /* Ouro VBM (primário) */
+  --primary: 38 45% 45%;
   --primary-foreground: 210 40% 98%;
 
-  /* Soft Slate Gray */
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222 47% 11.2%;
+  /* Cinza suave quente para áreas secundárias */
+  --secondary: 40 30% 96%;
+  --secondary-foreground: 230 15% 10%;
 
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --muted: 40 30% 96%;
+  --muted-foreground: 230 11% 45%;
 
-  /* Accent Gold/Bronze for premium feel */
-  --accent: 35 30% 96%;
-  --accent-foreground: 222 47% 11%;
+  /* Acentos com ouro claro */
+  --accent: 38 35% 92%;
+  --accent-foreground: 230 15% 10%;
 
-  --destructive: 0 84.2% 60.2%;
+  --destructive: 0 84% 60%;
   --destructive-foreground: 210 40% 98%;
 
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 222 47% 31%;
+  --border: 40 20% 90%;
+  --input: 40 20% 90%;
+  --ring: 38 45% 45%;
 
   --radius: 0.75rem;
 
@@ -44,33 +44,33 @@
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
+  --background: 0 0% 0%;
+  --foreground: 40 30% 96%;
 
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
+  --card: 0 0% 6%;
+  --card-foreground: 40 30% 96%;
 
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
+  --popover: 0 0% 6%;
+  --popover-foreground: 40 30% 96%;
 
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
+  --primary: 38 55% 50%;
+  --primary-foreground: 0 0% 0%;
 
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 40 30% 96%;
 
-  --muted: 217.2 32.6% 17.5%;
+  --muted: 0 0% 12%;
   --muted-foreground: 215 20.2% 65.1%;
 
-  --accent: 217.2 32.6% 17.5%;
+  --accent: 0 0% 16%;
   --accent-foreground: 210 40% 98%;
 
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 210 40% 98%;
 
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
+  --border: 0 0% 18%;
+  --input: 0 0% 18%;
+  --ring: 38 55% 50%;
 }
 
 @layer base {

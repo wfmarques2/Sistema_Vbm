@@ -1,15 +1,18 @@
 import { 
-  drivers, vehicles, services, profiles, users,
+  drivers, vehicles, services, profiles, users, clients,
   type Driver, type InsertDriver,
   type Vehicle, type InsertVehicle,
   type Service, type InsertService,
   type Profile, type InsertProfile,
   type User, type UpsertUser,
-  type ServiceWithDetails
+  type ServiceWithDetails,
+  type Client, type InsertClient,
+  type ClientDependent, type InsertClientDependent, type ClientWithDependents
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql, gte, lt, and } from "drizzle-orm";
+import { eq, desc, sql, gte, lt, and, or } from "drizzle-orm";
 import { authStorage } from "./replit_integrations/auth/storage";
+import { clientDependents } from "@shared/schema";
 
 export interface IStorage {
   // Auth & Profile
@@ -17,6 +20,18 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   getProfile(userId: string): Promise<Profile | undefined>;
   createProfile(profile: InsertProfile): Promise<Profile>;
+  
+  // Clients
+  getClients(): Promise<(Client & { completedTrips: number, dependentCount: number })[]>;
+  getClient(id: number): Promise<(Client & { completedTrips: number, dependentCount: number }) | undefined>;
+  createClient(client: InsertClient): Promise<Client>;
+  updateClient(id: number, client: Partial<InsertClient>): Promise<Client>;
+  deleteClient(id: number): Promise<void>;
+  
+  // Client Dependents
+  getClientDependents(clientId: number): Promise<ClientDependent[]>;
+  createClientDependent(clientId: number, dependent: Omit<InsertClientDependent, "clientId">): Promise<ClientDependent>;
+  deleteClientDependent(id: number): Promise<void>;
   
   // Drivers
   getDrivers(): Promise<Driver[]>;
@@ -62,6 +77,74 @@ export class DatabaseStorage implements IStorage {
     return profile;
   }
 
+  // --- Clients ---
+  async getClients(): Promise<(Client & { completedTrips: number, dependentCount: number })[]> {
+    const list = await db.select().from(clients).orderBy(desc(clients.id));
+    const results: (Client & { completedTrips: number, dependentCount: number })[] = [];
+    for (const c of list) {
+      const [{ count: tripsCount }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(services)
+        .where(and(eq(services.clientId, c.id), eq(services.status, 'finished')));
+      
+      const [{ count: depCount }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(clientDependents)
+        .where(eq(clientDependents.clientId, c.id));
+      
+      console.log(`[Storage] Client ${c.name} (ID: ${c.id}) has ${depCount} dependents`);
+
+      results.push({ 
+        ...c, 
+        completedTrips: Number(tripsCount),
+        dependentCount: Number(depCount)
+      });
+    }
+    return results;
+  }
+  async getClient(id: number): Promise<(Client & { completedTrips: number, dependentCount: number }) | undefined> {
+    const [c] = await db.select().from(clients).where(eq(clients.id, id));
+    if (!c) return undefined;
+    const [{ count: tripsCount }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(services)
+      .where(and(eq(services.clientId, c.id), eq(services.status, 'finished')));
+    
+    const [{ count: depCount }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(clientDependents)
+      .where(eq(clientDependents.clientId, c.id));
+
+    return { 
+      ...c, 
+      completedTrips: Number(tripsCount),
+      dependentCount: Number(depCount)
+    };
+  }
+  async createClient(insertClient: InsertClient): Promise<Client> {
+    const [client] = await db.insert(clients).values(insertClient).returning();
+    return client;
+  }
+  async updateClient(id: number, updates: Partial<InsertClient>): Promise<Client> {
+    const [updated] = await db.update(clients).set(updates).where(eq(clients.id, id)).returning();
+    return updated;
+  }
+  async deleteClient(id: number): Promise<void> {
+    await db.delete(clients).where(eq(clients.id, id));
+  }
+
+  // --- Client Dependents ---
+  async getClientDependents(clientId: number): Promise<ClientDependent[]> {
+    return db.select().from(clientDependents).where(eq(clientDependents.clientId, clientId)).orderBy(desc(clientDependents.id));
+  }
+  async createClientDependent(clientId: number, dependent: Omit<InsertClientDependent, "clientId">): Promise<ClientDependent> {
+    const [created] = await db.insert(clientDependents).values({ ...dependent, clientId }).returning();
+    return created;
+  }
+  async deleteClientDependent(id: number): Promise<void> {
+    await db.delete(clientDependents).where(eq(clientDependents.id, id));
+  }
+
   // --- Drivers ---
   async getDrivers(): Promise<Driver[]> {
     return db.select().from(drivers).orderBy(desc(drivers.id));
@@ -103,7 +186,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // --- Services ---
-  async getServices(filters?: { date?: string, driverId?: number, status?: string, start?: string, end?: string }): Promise<ServiceWithDetails[]> {
+  async getServices(filters?: {
+    date?: string,
+    driverId?: number,
+    vehicleId?: number,
+    status?: string,
+    start?: string,
+    end?: string,
+    statusPagamento?: string,
+    paymentMethod?: string,
+    limit?: number,
+    offset?: number,
+  }): Promise<ServiceWithDetails[]> {
     let query = db.select({
       id: services.id,
       dateTime: services.dateTime,
@@ -112,13 +206,39 @@ export class DatabaseStorage implements IStorage {
       type: services.type,
       clientName: services.clientName,
       clientPhone: services.clientPhone,
+      clientId: services.clientId,
       driverId: services.driverId,
       vehicleId: services.vehicleId,
+      passengers: services.passengers,
+      carModel: services.carModel,
+      mozioId: services.mozioId,
+      flight: services.flight,
+      paxAdt: services.paxAdt,
+      paxChd: services.paxChd,
+      paxInf: services.paxInf,
+      paxSen: services.paxSen,
+      paxFree: services.paxFree,
       value: services.value,
       paymentMethod: services.paymentMethod,
       status: services.status,
       notes: services.notes,
       createdAt: services.createdAt,
+      // Campos financeiros adicionais
+      valorCobrado: services.valorCobrado,
+      formaPagamento: services.formaPagamento,
+      statusPagamento: services.statusPagamento,
+      returnDateTime: services.returnDateTime,
+      guide: services.guide,
+      valorPagoParcial: services.valorPagoParcial,
+      restanteMetodo: services.restanteMetodo,
+      kmPrevisto: services.kmPrevisto,
+      kmReal: services.kmReal,
+      combustivel: services.combustivel,
+      pedagio: services.pedagio,
+      estacionamento: services.estacionamento,
+      alimentacao: services.alimentacao,
+      outrosCustos: services.outrosCustos,
+      observacaoCustos: services.observacaoCustos,
       driver: drivers,
       vehicle: vehicles
     })
@@ -132,7 +252,20 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(services.driverId, filters.driverId));
     }
     if (filters?.status) {
-      conditions.push(eq(services.status, filters.status));
+      const allowed = ["scheduled","in_progress","finished","canceled"] as const;
+      if (allowed.includes(filters.status as typeof allowed[number])) {
+        conditions.push(eq(services.status, filters.status as typeof allowed[number]));
+      }
+    }
+    if (filters?.vehicleId) {
+      conditions.push(eq(services.vehicleId, filters.vehicleId));
+    }
+    if (filters?.statusPagamento) {
+      conditions.push(eq(services.statusPagamento, filters.statusPagamento as any));
+    }
+    if (filters?.paymentMethod) {
+      // Consider both formaPagamento (new) and paymentMethod (legacy)
+      conditions.push(or(eq(services.formaPagamento, filters.paymentMethod as any), eq(services.paymentMethod, filters.paymentMethod as any)));
     }
     if (filters?.date) {
       // Simple date equality check (assuming date string YYYY-MM-DD)
@@ -152,7 +285,14 @@ export class DatabaseStorage implements IStorage {
       query = query.where(and(...conditions));
     }
 
-    return query.orderBy(desc(services.dateTime));
+    let q: any = query.orderBy(desc(services.dateTime));
+    if (typeof filters?.limit === "number") {
+      q = q.limit(filters.limit);
+    }
+    if (typeof filters?.offset === "number") {
+      q = q.offset(filters.offset);
+    }
+    return q;
   }
 
   async getService(id: number): Promise<ServiceWithDetails | undefined> {
@@ -164,13 +304,39 @@ export class DatabaseStorage implements IStorage {
       type: services.type,
       clientName: services.clientName,
       clientPhone: services.clientPhone,
+      clientId: services.clientId,
       driverId: services.driverId,
       vehicleId: services.vehicleId,
+      passengers: services.passengers,
+      carModel: services.carModel,
+      mozioId: services.mozioId,
+      flight: services.flight,
+      paxAdt: services.paxAdt,
+      paxChd: services.paxChd,
+      paxInf: services.paxInf,
+      paxSen: services.paxSen,
+      paxFree: services.paxFree,
       value: services.value,
       paymentMethod: services.paymentMethod,
       status: services.status,
       notes: services.notes,
       createdAt: services.createdAt,
+      // Campos financeiros adicionais
+      valorCobrado: services.valorCobrado,
+      formaPagamento: services.formaPagamento,
+      statusPagamento: services.statusPagamento,
+      returnDateTime: services.returnDateTime,
+      guide: services.guide,
+      valorPagoParcial: services.valorPagoParcial,
+      restanteMetodo: services.restanteMetodo,
+      kmPrevisto: services.kmPrevisto,
+      kmReal: services.kmReal,
+      combustivel: services.combustivel,
+      pedagio: services.pedagio,
+      estacionamento: services.estacionamento,
+      alimentacao: services.alimentacao,
+      outrosCustos: services.outrosCustos,
+      observacaoCustos: services.observacaoCustos,
       driver: drivers,
       vehicle: vehicles
     })

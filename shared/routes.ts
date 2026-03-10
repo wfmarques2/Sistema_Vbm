@@ -3,10 +3,14 @@ import {
   insertDriverSchema, 
   insertVehicleSchema, 
   insertServiceSchema,
+  insertClientSchema,
+  insertClientDependentSchema,
   drivers,
   vehicles,
   services,
-  profiles
+  clients,
+  profiles,
+  clientDependents
 } from './schema';
 
 export const errorSchemas = {
@@ -23,6 +27,77 @@ export const errorSchemas = {
 };
 
 export const api = {
+  // --- Clients ---
+  clients: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/clients',
+      responses: {
+        200: z.array(z.custom<typeof clients.$inferSelect & { completedTrips: number, dependentCount: number }>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/clients/:id',
+      responses: {
+        200: z.custom<typeof clients.$inferSelect & { completedTrips: number, dependentCount: number }>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/clients',
+      input: insertClientSchema,
+      responses: {
+        201: z.custom<typeof clients.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/clients/:id',
+      input: insertClientSchema.partial(),
+      responses: {
+        200: z.custom<typeof clients.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/clients/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+    dependents: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/clients/:id/dependents',
+        responses: {
+          200: z.array(z.custom<typeof clientDependents.$inferSelect>()),
+        },
+      },
+      create: {
+        method: 'POST' as const,
+        path: '/api/clients/:id/dependents',
+        input: insertClientDependentSchema.omit({ clientId: true }),
+        responses: {
+          201: z.custom<typeof clientDependents.$inferSelect>(),
+          400: errorSchemas.validation,
+        },
+      },
+      delete: {
+        method: 'DELETE' as const,
+        path: '/api/clients/dependents/:id',
+        responses: {
+          204: z.void(),
+          404: errorSchemas.notFound,
+        },
+      },
+    },
+  },
   // --- Drivers ---
   drivers: {
     list: {

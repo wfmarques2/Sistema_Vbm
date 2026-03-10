@@ -24,6 +24,33 @@ export function useServices(filters?: ServiceFilters) {
   });
 }
 
+export function useServicesPaged(filters?: Partial<ServiceFilters & {
+  vehicleId?: number;
+  statusPagamento?: string;
+  paymentMethod?: string;
+}>, limit = 20, offset = 0) {
+  const queryKey = [api.services.list.path, filters, limit, offset];
+  return useQuery({
+    queryKey,
+    queryFn: async () => {
+      const url = new URL(api.services.list.path, window.location.origin);
+      if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== "") url.searchParams.append(key, String(value));
+        });
+      }
+      url.searchParams.set("limit", String(limit));
+      url.searchParams.set("offset", String(offset));
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch services");
+      const rows = api.services.list.responses[200].parse(await res.json());
+      const totalHeader = res.headers.get("X-Total-Count");
+      const total = totalHeader ? Number(totalHeader) : rows.length;
+      return { rows, total };
+    },
+  });
+}
+
 export function useCreateService() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -37,16 +64,27 @@ export function useCreateService() {
         body: JSON.stringify(validated),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to create service");
+      if (!res.ok) {
+        if (res.status === 400) {
+          const error = api.services.create.responses[400].parse(await res.json());
+          throw new Error(error.message);
+        }
+        try {
+          const body = await res.json();
+          throw new Error(body?.message || "Falha ao criar serviço");
+        } catch {
+          throw new Error("Falha ao criar serviço");
+        }
+      }
       return api.services.create.responses[201].parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.services.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.stats.get.path] });
-      toast({ title: "Success", description: "Service scheduled successfully" });
+      toast({ title: "Sucesso", description: "Serviço agendado com sucesso" });
     },
     onError: (error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 }
@@ -65,16 +103,21 @@ export function useUpdateService() {
         body: JSON.stringify(validated),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to update service");
+      if (!res.ok) throw new Error("Falha ao atualizar serviço");
       return api.services.update.responses[200].parse(await res.json());
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.services.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.stats.get.path] });
-      toast({ title: "Success", description: "Service updated successfully" });
+      // Atualiza saldos em Clientes quando um serviço altera pagamento (ex.: saldo)
+      queryClient.invalidateQueries({ queryKey: [api.clients.list.path] });
+      if (variables?.id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/financial/services/:id/profit", variables.id] });
+      }
+      toast({ title: "Sucesso", description: "Serviço atualizado com sucesso" });
     },
     onError: (error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 }
@@ -87,15 +130,15 @@ export function useDeleteService() {
     mutationFn: async (id: number) => {
       const url = buildUrl(api.services.delete.path, { id });
       const res = await fetch(url, { method: api.services.delete.method, credentials: "include" });
-      if (!res.ok) throw new Error("Failed to delete service");
+      if (!res.ok) throw new Error("Falha ao excluir serviço");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.services.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.stats.get.path] });
-      toast({ title: "Success", description: "Service deleted successfully" });
+      toast({ title: "Sucesso", description: "Serviço excluído com sucesso" });
     },
     onError: (error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 }

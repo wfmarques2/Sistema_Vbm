@@ -8,7 +8,7 @@ export function useDrivers() {
     queryKey: [api.drivers.list.path],
     queryFn: async () => {
       const res = await fetch(api.drivers.list.path, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch drivers");
+      if (!res.ok) throw new Error("Falha ao carregar motoristas");
       return api.drivers.list.responses[200].parse(await res.json());
     },
   });
@@ -46,16 +46,16 @@ export function useCreateDriver() {
           const error = api.drivers.create.responses[400].parse(await res.json());
           throw new Error(error.message);
         }
-        throw new Error("Failed to create driver");
+        throw new Error("Falha ao criar motorista");
       }
       return api.drivers.create.responses[201].parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.drivers.list.path] });
-      toast({ title: "Success", description: "Driver created successfully" });
+      toast({ title: "Sucesso", description: "Motorista criado com sucesso" });
     },
     onError: (error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 }
@@ -74,15 +74,15 @@ export function useUpdateDriver() {
         body: JSON.stringify(validated),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to update driver");
+      if (!res.ok) throw new Error("Falha ao atualizar motorista");
       return api.drivers.update.responses[200].parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.drivers.list.path] });
-      toast({ title: "Success", description: "Driver updated successfully" });
+      toast({ title: "Sucesso", description: "Motorista atualizado com sucesso" });
     },
     onError: (error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 }
@@ -95,14 +95,14 @@ export function useDeleteDriver() {
     mutationFn: async (id: number) => {
       const url = buildUrl(api.drivers.delete.path, { id });
       const res = await fetch(url, { method: api.drivers.delete.method, credentials: "include" });
-      if (!res.ok) throw new Error("Failed to delete driver");
+      if (!res.ok) throw new Error("Falha ao excluir motorista");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.drivers.list.path] });
-      toast({ title: "Success", description: "Driver deleted successfully" });
+      toast({ title: "Sucesso", description: "Motorista excluído com sucesso" });
     },
     onError: (error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
 }
