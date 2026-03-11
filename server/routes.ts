@@ -379,9 +379,8 @@ export async function registerRoutes(
 
   // List users (for admin settings)
   app.get("/api/users", async (req, res) => {
-    // Basic auth check
-    const cookies = parseCookies(req.headers.cookie);
-    const userId = cookies["session_user_id"];
+    // Basic auth check via session
+    const userId = (req as any).session?.userId;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     // In a real app, verify if user is admin via profiles table
@@ -411,8 +410,7 @@ export async function registerRoutes(
   // Link user to a driver (admin only)
   app.put("/api/users/:id/driver", async (req, res) => {
     try {
-      const cookies = parseCookies(req.headers.cookie);
-      const requesterId = cookies["session_user_id"];
+      const requesterId = (req as any).session?.userId;
       if (!requesterId) return res.status(401).json({ message: "Unauthorized" });
       const [requesterProfile] = await db.select().from(profiles).where(eq(profiles.userId, requesterId));
       if (requesterProfile?.role !== "admin") {
@@ -437,8 +435,7 @@ export async function registerRoutes(
 
   app.put("/api/users/:id/role", async (req, res) => {
     try {
-      const cookies = parseCookies(req.headers.cookie);
-      const requesterId = cookies["session_user_id"];
+      const requesterId = (req as any).session?.userId;
       if (!requesterId) return res.status(401).json({ message: "Unauthorized" });
       const [requesterProfile] = await db.select().from(profiles).where(eq(profiles.userId, requesterId));
       if (requesterProfile?.role !== "admin") {
@@ -466,7 +463,8 @@ export async function registerRoutes(
   app.post("/api/invitations", async (req, res) => {
     try {
         const cookies = parseCookies(req.headers.cookie);
-        const userId = cookies["session_user_id"];
+        const cookieUserId = cookies["session_user_id"];
+        const userId = (req as any).session?.userId ?? cookieUserId;
         if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
         // Check if requester is admin
@@ -536,7 +534,8 @@ export async function registerRoutes(
   app.post("/api/admin/users", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
       const [requesterProfile] = await db.select().from(profiles).where(eq(profiles.userId, userId));
@@ -608,15 +607,9 @@ export async function registerRoutes(
         passwordSalt: salt,
       });
 
-      // Login the user immediately
+      // Login the user immediately (session-based)
       const [profile] = await db.select().from(profiles).where(eq(profiles.userId, user.id));
-
-      res.cookie("session_user_id", user.id, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
+      (req as any).session.userId = user.id;
 
       return res.json({
         id: user.id,
@@ -777,7 +770,8 @@ export async function registerRoutes(
     };
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (userId) {
         let [profile] = await db.select().from(profiles).where(eq(profiles.userId, userId));
         if (profile?.role === "driver") {
@@ -995,7 +989,8 @@ export async function registerRoutes(
   app.post("/api/services/:id/expenses", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const id = Number(req.params.id);
       const schema = z.object({
@@ -1039,7 +1034,8 @@ export async function registerRoutes(
   app.post("/api/financial/vehicle-expenses", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         vehicleId: z.number().int().positive(),
@@ -1063,7 +1059,8 @@ export async function registerRoutes(
   app.get("/api/financial/vehicle-expenses", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         start: z.coerce.date().optional(),
@@ -1116,7 +1113,8 @@ export async function registerRoutes(
   app.put("/api/financial/vehicle-expenses/:id", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const id = Number(req.params.id);
       const schema = z.object({
@@ -1145,7 +1143,8 @@ export async function registerRoutes(
   app.post("/api/financial/vehicle-expenses/:id/disable", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const id = Number(req.params.id);
       const [updated] = await db.update(vehicleExpenses).set({ active: false }).where(eq(vehicleExpenses.id, id)).returning();
@@ -1159,7 +1158,8 @@ export async function registerRoutes(
   app.post("/api/financial/vehicle-km-logs", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         vehicleId: z.number().int().positive(),
@@ -1184,7 +1184,8 @@ export async function registerRoutes(
   app.get("/api/financial/vehicle-km-logs", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         start: z.coerce.date().optional(),
@@ -1228,7 +1229,8 @@ export async function registerRoutes(
   app.get("/api/financial/driver-payments", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         start: z.coerce.date().optional(),
@@ -1276,7 +1278,8 @@ export async function registerRoutes(
   app.post("/api/financial/company-expenses", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         categoria: z.string().min(2),
@@ -1308,7 +1311,8 @@ export async function registerRoutes(
   app.get("/api/financial/company-expenses", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         start: z.coerce.date().optional(),
@@ -1358,7 +1362,8 @@ export async function registerRoutes(
   app.put("/api/financial/company-expenses/:id", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const id = Number(req.params.id);
       const schema = z.object({
@@ -1390,7 +1395,8 @@ export async function registerRoutes(
   app.post("/api/financial/company-expenses/:id/disable", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const id = Number(req.params.id);
       const [updated] = await db.update(companyExpenses).set({ active: false }).where(eq(companyExpenses.id, id)).returning();
@@ -1404,7 +1410,8 @@ export async function registerRoutes(
   app.post("/api/financial/driver-payments", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         driverId: z.number().int().positive(),
@@ -1435,7 +1442,8 @@ export async function registerRoutes(
   app.delete("/api/financial/driver-payments/:id", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const id = Number(req.params.id);
       const [deleted] = await db.delete(driverPayments).where(eq(driverPayments.id, id)).returning();
@@ -1448,7 +1456,8 @@ export async function registerRoutes(
   app.put("/api/financial/driver-payments/:id", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const id = Number(req.params.id);
       const schema = z.object({
@@ -1480,7 +1489,8 @@ export async function registerRoutes(
   app.get("/api/financial/reports/period", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         start: z.coerce.date(),
@@ -1628,7 +1638,8 @@ export async function registerRoutes(
   app.get("/api/financial/expenses", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         start: z.coerce.date().optional(),
@@ -1781,7 +1792,8 @@ export async function registerRoutes(
   app.post("/api/financial/expenses", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const base = z.object({ tipo: z.enum(["vehicle","company","driver_payment"]) });
       const tipoParsed = base.parse({ tipo: req.body?.tipo });
@@ -1869,7 +1881,8 @@ export async function registerRoutes(
   app.get("/api/financial/revenues", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         clientId: z.coerce.number().int().positive().optional(),
@@ -1967,7 +1980,8 @@ export async function registerRoutes(
   app.post("/api/financial/revenues", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.union([
         z.object({
@@ -2042,7 +2056,8 @@ export async function registerRoutes(
   app.delete("/api/financial/revenues/:id", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const id = Number(req.params.id);
       if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ message: "ID inválido" });
@@ -2064,7 +2079,8 @@ export async function registerRoutes(
   app.get("/api/financial/services/:id/profit", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const id = Number(req.params.id);
       const finance = await financialService.getFinanceByServiceId(id);
@@ -2078,7 +2094,8 @@ export async function registerRoutes(
   app.get("/api/financial/dashboard", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const schema = z.object({
         start: z.coerce.date().optional(),
@@ -2273,7 +2290,8 @@ export async function registerRoutes(
   app.get("/api/financial/dashboard.csv", async (req, res) => {
     try {
       const cookies = parseCookies(req.headers.cookie);
-      const userId = cookies["session_user_id"];
+      const cookieUserId = cookies["session_user_id"];
+      const userId = (req as any).session?.userId ?? cookieUserId;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const jsonRes = await (await fetch(`${req.protocol}://${req.headers.host}/api/financial/dashboard`, { headers: { cookie: req.headers.cookie || "" } })).json();
       const headers = ["receitaMesCentavos", "lucroLiquidoMesCentavos", "custoMedioPorKmCentavos", "lucroPorKmCentavos", "margemMediaPorViagem", "prejuizo"];

@@ -34,7 +34,8 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.COOKIE_SECURE === "true",
+      sameSite: "lax",
       maxAge: sessionTtl,
     },
   });
@@ -90,7 +91,7 @@ export async function setupAuth(app: Express) {
           name: strategyName,
           config,
           scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/callback`,
+          callbackURL: `${process.env.AUTH_CALLBACK_SCHEME || "https"}://${domain}/api/callback`,
         },
         verify
       );
