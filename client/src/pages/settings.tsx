@@ -1,5 +1,5 @@
 import { Layout } from "@/components/layout";
-import { useUsers, useAddUser, useUpdateUserRole, useLinkUserDriver } from "@/hooks/use-users";
+import { useUsers, useAddUser, useUpdateUserRole, useLinkUserDriver, useUpdateUserBasic, useDeleteUser } from "@/hooks/use-users";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -35,7 +35,11 @@ export default function SettingsPage() {
   const addUserMutation = useAddUser();
   const updateRoleMutation = useUpdateUserRole();
   const linkUserDriverMutation = useLinkUserDriver();
+  const updateUserMutation = useUpdateUserBasic();
+  const deleteUserMutation = useDeleteUser();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
   const form = useForm({
     resolver: zodResolver(adminCreateUserSchema),
@@ -44,6 +48,9 @@ export default function SettingsPage() {
       email: "",
       role: "operational" as "admin" | "operational" | "driver",
     }
+  });
+  const editForm = useForm<{ firstName: string; lastName: string; email: string }>({
+    defaultValues: { firstName: "", lastName: "", email: "" }
   });
 
   const onSubmit = async (values: any) => {
@@ -150,12 +157,13 @@ export default function SettingsPage() {
               <TableHead>Função</TableHead>
               <TableHead>Motorista</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center">Carregando...</TableCell>
+                <TableCell colSpan={6} className="text-center">Carregando...</TableCell>
               </TableRow>
             ) : users?.map((user) => (
               <TableRow key={user.id}>
@@ -211,11 +219,75 @@ export default function SettingsPage() {
                       Assumindo que todos listados são usuários criados. */}
                    <span className="text-muted-foreground">Cadastrado</span>
                 </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditingUserId(user.id);
+                        editForm.reset({
+                          firstName: user.firstName || "",
+                          lastName: user.lastName || "",
+                          email: user.email || "",
+                        });
+                        setIsEditOpen(true);
+                      }}
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        if (confirm(`Excluir o usuário ${user.firstName} ${user.lastName}?`)) {
+                          deleteUserMutation.mutate(user.id);
+                        }
+                      }}
+                      disabled={deleteUserMutation.isPending}
+                    >
+                      Excluir
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={editForm.handleSubmit((values) => {
+              if (!editingUserId) return;
+              updateUserMutation.mutate({ id: editingUserId, ...values });
+              setIsEditOpen(false);
+            })}
+            className="space-y-4"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Nome</label>
+                <Input {...editForm.register("firstName", { required: true })} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Sobrenome</label>
+                <Input {...editForm.register("lastName", { required: true })} />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Email</label>
+              <Input type="email" {...editForm.register("email", { required: true })} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={updateUserMutation.isPending}>Salvar</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

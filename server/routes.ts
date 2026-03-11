@@ -459,6 +459,70 @@ export async function registerRoutes(
     }
   });
 
+  // Editar dados básicos do usuário (admin)
+  app.put("/api/users/:id", async (req, res) => {
+    try {
+      const requesterId = (req as any).session?.userId;
+      if (!requesterId) return res.status(401).json({ message: "Unauthorized" });
+      const [requesterProfile] = await db.select().from(profiles).where(eq(profiles.userId, requesterId));
+      if (requesterProfile?.role !== "admin") {
+        return res.status(403).json({ message: "Apenas administradores podem editar usuários" });
+      }
+      const schema = z.object({
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        email: z.string().email(),
+      });
+      const input = schema.parse(req.body);
+      const targetUserId = req.params.id;
+      const [u] = await db.select().from(users).where(eq(users.id, targetUserId));
+      if (!u) return res.status(404).json({ message: "Usuário não encontrado" });
+      if (input.email && input.email !== u.email) {
+        const [dup] = await db.select().from(users).where(eq(users.email, input.email));
+        if (dup) return res.status(400).json({ message: "E-mail já em uso" });
+      }
+      const [updated] = await db
+        .update(users)
+        .set({ email: input.email, firstName: input.firstName, lastName: input.lastName, updatedAt: new Date() })
+        .where(eq(users.id, targetUserId))
+        .returning();
+      const [p] = await db.select().from(profiles).where(eq(profiles.userId, targetUserId));
+      if (p) {
+        await db.update(profiles).set({ name: `${input.firstName} ${input.lastName}` }).where(eq(profiles.id, p.id));
+      }
+      return res.json({ id: updated.id, email: updated.email, firstName: updated.firstName, lastName: updated.lastName });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      return res.status(500).json({ message: "Erro ao editar usuário" });
+    }
+  });
+
+  // Excluir usuário (admin), prevenindo excluir a si mesmo
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      const requesterId = (req as any).session?.userId;
+      if (!requesterId) return res.status(401).json({ message: "Unauthorized" });
+      const [requesterProfile] = await db.select().from(profiles).where(eq(profiles.userId, requesterId));
+      if (requesterProfile?.role !== "admin") {
+        return res.status(403).json({ message: "Apenas administradores podem excluir usuários" });
+      }
+      const targetUserId = req.params.id;
+      if (targetUserId === requesterId) {
+        return res.status(400).json({ message: "Você não pode excluir seu próprio usuário" });
+      }
+      const [u] = await db.select().from(users).where(eq(users.id, targetUserId));
+      if (!u) return res.status(404).json({ message: "Usuário não encontrado" });
+      await db.delete(localAuth).where(eq(localAuth.userId, targetUserId));
+      await db.delete(profiles).where(eq(profiles.userId, targetUserId));
+      await db.delete(users).where(eq(users.id, targetUserId));
+      return res.status(204).end();
+    } catch (err) {
+      return res.status(500).json({ message: "Erro ao excluir usuário" });
+    }
+  });
+
   // Create Invitation
   app.post("/api/invitations", async (req, res) => {
     try {

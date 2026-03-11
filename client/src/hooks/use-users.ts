@@ -137,3 +137,55 @@ export function useLinkUserDriver() {
     },
   });
 }
+
+export function useUpdateUserBasic() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (input: { id: string; firstName: string; lastName: string; email: string }) => {
+      const res = await fetch(`/api/users/${input.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ firstName: input.firstName, lastName: input.lastName, email: input.email }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message || "Falha ao atualizar usuário");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "Usuário atualizado", description: "Dados do usuário foram salvos." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message || "Falha ao excluir usuário");
+      }
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "Usuário excluído", description: "O usuário foi removido com sucesso." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
+}
