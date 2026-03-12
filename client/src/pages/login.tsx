@@ -129,7 +129,8 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center lg:text-left">
-            <h2 className="text-3xl font-bold font-display text-primary">Bem-vindo de volta</h2>
+            <img src="/logo-vbm.png" alt="VBM Transfer Executivo" className="lg:hidden mx-auto mb-4 w-24 h-24 object-contain" />
+            <h2 className="text-3xl font-bold font-display text-primary">Bem-vindo</h2>
             <p className="text-muted-foreground mt-2">Faça login para acessar seu painel.</p>
           </div>
 

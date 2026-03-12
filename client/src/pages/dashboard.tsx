@@ -70,7 +70,7 @@ export default function Dashboard() {
             <div className="space-y-2">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Operacional</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Link href="/services?new=1">
+              <Link href="/services/new">
                 <div className="nav-item w-full rounded-lg">
                   <Calendar className="w-4 h-4" />
                   <span>Agendar Novo Transfer</span>
