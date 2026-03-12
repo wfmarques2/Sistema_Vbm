@@ -1,5 +1,6 @@
 import { 
   drivers, vehicles, services, profiles, users, clients,
+  companyRevenues, driverPayments, vehicleKmLogs,
   type Driver, type InsertDriver,
   type Vehicle, type InsertVehicle,
   type Service, type InsertService,
@@ -130,6 +131,12 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
   async deleteClient(id: number): Promise<void> {
+    // Remove dependentes
+    await db.delete(clientDependents).where(eq(clientDependents.clientId, id));
+    // Desvincular referências
+    await db.update(services).set({ clientId: null }).where(eq(services.clientId, id));
+    await db.update(companyRevenues).set({ clientId: null }).where(eq(companyRevenues.clientId, id));
+    // Excluir cliente
     await db.delete(clients).where(eq(clients.id, id));
   }
 
@@ -162,6 +169,14 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
   async deleteDriver(id: number): Promise<void> {
+    // Remover pagamentos do motorista
+    await db.delete(driverPayments).where(eq(driverPayments.driverId, id));
+    // Desvincular logs de KM e serviços
+    await db.update(vehicleKmLogs).set({ driverId: null }).where(eq(vehicleKmLogs.driverId, id));
+    await db.update(services).set({ driverId: null }).where(eq(services.driverId, id));
+    // Limpar vínculo em perfis (se houver)
+    await db.update(profiles).set({ driverId: null }).where(eq(profiles.driverId, id));
+    // Excluir motorista
     await db.delete(drivers).where(eq(drivers.id, id));
   }
 
