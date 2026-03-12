@@ -933,6 +933,37 @@ export async function registerRoutes(
           normalized.valorCobrado = Math.round(numberValue * 100);
         }
       }
+      // Fallback robusto: criar cliente automaticamente se ausente
+      if (!normalized.clientId && (normalized.clientName || normalized.clientPhone)) {
+        const nameInput = String(normalized.clientName || "").trim();
+        const phoneInput = String(normalized.clientPhone || "").trim();
+        const digits = (s: string) => String(s || "").replace(/\D/g, "");
+        const phoneDigits = digits(phoneInput);
+        let found: any | null = null;
+        if (phoneDigits) {
+          const rows = await db.select().from(clients);
+          found =
+            rows.find((c: any) => digits(c.phone) === phoneDigits) ??
+            rows.find((c: any) => String(c.name || "").toLowerCase() === nameInput.toLowerCase());
+        }
+        if (found) {
+          normalized.clientId = found.id;
+          if (!normalized.clientName) normalized.clientName = found.name;
+          if (!normalized.clientPhone) normalized.clientPhone = found.phone;
+        } else {
+          const [created] = await db
+            .insert(clients)
+            .values({
+              name: nameInput || "Cliente",
+              phone: phoneInput || "",
+              email: "",
+              nationality: "",
+              balanceCentavos: 0,
+            } as any)
+            .returning();
+          normalized.clientId = created.id;
+        }
+      }
       if ((!normalized.clientName || String(normalized.clientName).trim() === "") && normalized.clientId) {
         const [c] = await db.select().from(clients).where(eq(clients.id, normalized.clientId));
         if (c) {

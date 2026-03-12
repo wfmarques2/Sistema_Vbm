@@ -11,7 +11,7 @@ import { z } from "zod";
 import { useCreateService, useUpdateService } from "@/hooks/use-services";
 import { useDrivers } from "@/hooks/use-drivers";
 import { useVehicles } from "@/hooks/use-vehicles";
-import { useClients } from "@/hooks/use-clients";
+import { useClients, useClientDependents, useCreateClientDependent } from "@/hooks/use-clients";
 import { useRoute, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { api } from "@shared/routes";
@@ -123,6 +123,12 @@ export default function ServiceEditPage() {
   }, [id, isEdit]);
 
   const selectedClientId = form.watch("clientId");
+  const selectedClientIdNum = Number(selectedClientId || 0);
+  const { data: dependents } = useClientDependents(Number.isFinite(selectedClientIdNum) ? selectedClientIdNum : 0);
+  const createDependent = useCreateClientDependent();
+  const [depSelectedId, setDepSelectedId] = useState<number>(0);
+  const [newDepName, setNewDepName] = useState("");
+  const [newDepPhone, setNewDepPhone] = useState("");
   useEffect(() => {
     const idNum = Number(selectedClientId);
     if (!clients || !Number.isFinite(idNum) || idNum <= 0) return;
@@ -130,6 +136,9 @@ export default function ServiceEditPage() {
     if (!c) return;
     form.setValue("clientName", c.name ?? "", { shouldDirty: true });
     form.setValue("clientPhone", c.phone ?? "", { shouldDirty: true });
+    setDepSelectedId(0);
+    setNewDepName("");
+    setNewDepPhone("");
   }, [selectedClientId, clients]);
 
   const onSubmit = async (values: any) => {
@@ -142,8 +151,36 @@ export default function ServiceEditPage() {
       return Number.isFinite(num) ? num.toFixed(2) : "0";
     })();
 
+    // Se houver dependente selecionado, usa os dados dele como passageiro.
+    let clientNameFinal = String(values.clientName || "").trim();
+    let clientPhoneFinal = String(values.clientPhone || "").trim();
+    if (selectedClientIdNum > 0 && depSelectedId > 0) {
+      const dep = (dependents || []).find((d: any) => d.id === depSelectedId);
+      if (dep) {
+        clientNameFinal = dep.name || clientNameFinal;
+        clientPhoneFinal = dep.phone || clientPhoneFinal;
+      }
+    }
+    // Se preencher manualmente novo dependente, cria e passa a usá-lo
+    if (selectedClientIdNum > 0 && depSelectedId === 0 && newDepName.trim()) {
+      try {
+        const created = await createDependent.mutateAsync({
+          clientId: selectedClientIdNum,
+          name: newDepName.trim(),
+          phone: newDepPhone.trim() || undefined,
+        } as any);
+        clientNameFinal = created?.name || newDepName.trim();
+        clientPhoneFinal = created?.phone || clientPhoneFinal;
+      } catch {
+        clientNameFinal = newDepName.trim();
+        clientPhoneFinal = newDepPhone.trim() || clientPhoneFinal;
+      }
+    }
+
     const payload = {
       ...values,
+      clientName: clientNameFinal || values.clientName,
+      clientPhone: clientPhoneFinal || values.clientPhone,
       value: normalized,
       kmPrevisto: values.kmPrevisto != null && values.kmPrevisto !== "" ? String(values.kmPrevisto).replace(",", ".") : undefined,
       driverId: values.driverId ? parseInt(values.driverId) : null,
@@ -196,6 +233,32 @@ export default function ServiceEditPage() {
                 <FormMessage />
               </FormItem>
             )} />
+            {Number(selectedClientId || 0) > 0 && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Dependente (passageiro)</label>
+                  <Select value={String(depSelectedId)} onValueChange={(v) => setDepSelectedId(Number(v))}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o dependente" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">— Titular ({form.watch("clientName") || "Cliente"}) —</SelectItem>
+                      {(dependents || []).map((d: any) => (
+                        <SelectItem key={d.id} value={String(d.id)}>{d.name}{d.phone ? ` (${d.phone})` : ""}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-sm font-medium">Novo dependente (nome)</label>
+                    <Input value={newDepName} onChange={(e) => setNewDepName(e.target.value)} placeholder="Nome completo" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Telefone (opcional)</label>
+                    <Input value={newDepPhone} onChange={(e) => setNewDepPhone(e.target.value)} placeholder="(11) 99999-9999" />
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="dateTime" render={({ field }) => (
                 <FormItem>
