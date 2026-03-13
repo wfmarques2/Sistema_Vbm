@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Clock, MapPin, ChevronLeft as BackIcon, X } from "lucide-react";
-import { SiWaze, SiGooglemaps } from "react-icons/si";
+import { SiWaze, SiGooglemaps, SiWhatsapp } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -68,6 +68,13 @@ export default function AgendaPage() {
   function formatInputBRL(raw: string): string {
     const cents = parseBRLToCents(raw);
     return toBRL(cents);
+  }
+
+  function buildWhatsappUrl(phone?: string | null): string | null {
+    const digits = String(phone || "").replace(/\D/g, "");
+    if (!digits) return null;
+    const withCountry = digits.startsWith("55") ? digits : `55${digits}`;
+    return `https://wa.me/${withCountry}`;
   }
 
   function initCostsFromService(s: any | undefined) {
@@ -268,6 +275,7 @@ export default function AgendaPage() {
             const originUrlGmaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.origin)}`;
             const destUrlWaze = `https://waze.com/ul?q=${encodeURIComponent(s.destination)}&navigate=yes`;
             const destUrlGmaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.destination)}`;
+            const whatsappUrl = buildWhatsappUrl(s.clientPhone);
             const serviceId = s.id;
             const vehicleId = s.vehicleId;
             return (
@@ -300,6 +308,27 @@ export default function AgendaPage() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                  <div className="mt-3">
+                    <a
+                      href={whatsappUrl || "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => {
+                        if (!whatsappUrl) {
+                          e.preventDefault();
+                          toast({
+                            title: "Sem telefone do cliente",
+                            description: "Cadastre o número do cliente para abrir o WhatsApp.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md w-full ${whatsappUrl ? "bg-[#25D366] text-black hover:bg-[#1fc15a]" : "bg-[#2a2a2a] text-white/60 cursor-not-allowed"}`}
+                    >
+                      <SiWhatsapp className="w-5 h-5" />
+                      <span>Falar com cliente no WhatsApp</span>
+                    </a>
                   </div>
                   <div className="grid grid-cols-2 gap-3 mt-4">
                     <Button 

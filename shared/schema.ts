@@ -70,6 +70,8 @@ export const vehicles = pgTable("vehicles", {
   model: text("model").notNull(),
   plate: text("plate").notNull().unique(),
   capacity: integer("capacity").notNull(),
+  color: text("color"),
+  luggageCapacity: integer("luggage_capacity").default(0).notNull(),
   type: text("type", { enum: vehicleTypeEnum }).default("sedan").notNull(),
   status: text("status", { enum: vehicleStatusEnum }).default("available").notNull(),
   notes: text("notes"),
@@ -93,6 +95,7 @@ export const services = pgTable("services", {
   notes: text("notes"),
   // Novos campos operacionais
   passengers: integer("passengers"),                // quantidade de passageiros
+  bags: integer("bags").default(0),                 // quantidade de malas
   carModel: text("car_model"),                      // modelo de carro desejado
   mozioId: text("mozio_id"),                        // ID de integração Mozio
   flight: text("flight"),                           // Número do voo
@@ -114,6 +117,8 @@ export const services = pgTable("services", {
   valorPagoParcial: integer("valor_pago_parcial").default(0),
   // Como será pago o restante (pix ou diretamente ao motorista)
   restanteMetodo: text("restante_metodo", { enum: remainderMethodEnum }),
+  // Detalhe do método quando o restante é "ao motorista"
+  restanteMetodoDriver: text("restante_metodo_driver", { enum: paymentMethodEnum }),
   // Quilometragens previstas/realizadas (decimal), úteis para cálculo de custos.
   kmPrevisto: numeric("km_previsto", { precision: 8, scale: 2 }),
   kmReal: numeric("km_real", { precision: 8, scale: 2 }),
@@ -304,6 +309,7 @@ export const insertVehicleSchema = createInsertSchema(vehicles)
   .omit({ id: true, createdAt: true })
   .extend({
     capacity: z.coerce.number().int().positive(),
+    luggageCapacity: z.coerce.number().int().min(0).default(0),
   });
 export const insertServiceSchema = createInsertSchema(services)
   .omit({ id: true, createdAt: true })
@@ -312,6 +318,8 @@ export const insertServiceSchema = createInsertSchema(services)
     returnDateTime: z.coerce.date().optional(),
     guide: z.string().optional(),
     passengers: z.coerce.number().int().min(0).optional(),
+    bags: z.coerce.number().int().min(0).optional(),
+    restanteMetodoDriver: z.enum(paymentMethodEnum).nullable().optional(),
     paxAdt: z.coerce.number().int().min(0).optional(),
     paxChd: z.coerce.number().int().min(0).optional(),
     paxInf: z.coerce.number().int().min(0).optional(),

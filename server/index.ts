@@ -92,6 +92,12 @@ app.use((req, res, next) => {
     CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
   `);
 
+  await pool.query(`ALTER TABLE IF EXISTS "services" ADD COLUMN IF NOT EXISTS "bags" integer DEFAULT 0;`);
+  await pool.query(`ALTER TABLE IF EXISTS "vehicles" ADD COLUMN IF NOT EXISTS "color" text;`);
+  await pool.query(`ALTER TABLE IF EXISTS "vehicles" ADD COLUMN IF NOT EXISTS "luggage_capacity" integer DEFAULT 0;`);
+  await pool.query(`ALTER TABLE IF EXISTS "services" ADD COLUMN IF NOT EXISTS "restante_metodo_driver" text;`);
+  await pool.query(`ALTER TABLE IF EXISTS "services" ADD COLUMN IF NOT EXISTS "flight" text;`);
+
   // Sessions (Postgres store)
   const PgStore = connectPg(session);
   app.use(

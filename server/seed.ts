@@ -73,9 +73,9 @@ export async function seedDatabase() {
 
   // Vehicles
   const vehicleData: InsertVehicle[] = [
-    { model: "Toyota Corolla", plate: "ABC-1234", capacity: 4, status: "available", notes: "Blindado" },
-    { model: "MB Vito", plate: "XYZ-9876", capacity: 7, status: "in_use" },
-    { model: "Honda Civic", plate: "DEF-5678", capacity: 4, status: "maintenance" },
+    { model: "Toyota Corolla", plate: "ABC-1234", capacity: 4, luggageCapacity: 3, color: "Preto", status: "available", notes: "Blindado" },
+    { model: "MB Vito", plate: "XYZ-9876", capacity: 7, luggageCapacity: 8, color: "Prata", status: "in_use" },
+    { model: "Honda Civic", plate: "DEF-5678", capacity: 4, luggageCapacity: 3, color: "Azul", status: "maintenance" },
   ];
 
   const createdVehicles = [];

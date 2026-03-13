@@ -51,6 +51,8 @@ export default function VehiclesPage() {
       model: "",
       plate: "",
       capacity: 4,
+      color: "",
+      luggageCapacity: 0,
       type: "sedan",
       status: "available",
       notes: ""
@@ -72,6 +74,7 @@ export default function VehiclesPage() {
     const payload = {
         ...values,
         capacity: parseInt(values.capacity),
+        luggageCapacity: parseInt(values.luggageCapacity ?? 0),
     };
 
     if (editingId) {
@@ -89,6 +92,8 @@ export default function VehiclesPage() {
     form.reset({
         ...vehicle,
         capacity: vehicle.capacity.toString(), // numeric input string
+        color: vehicle.color || "",
+        luggageCapacity: Number(vehicle.luggageCapacity ?? 0),
         type: vehicle.type || "sedan",
     });
     setIsDialogOpen(true);
@@ -149,7 +154,31 @@ export default function VehiclesPage() {
                     name="capacity"
                     render={({ field }) => (
                       <FormItem>
-                      <FormLabel>Capacidade</FormLabel>
+                      <FormLabel>Capacidade PAX</FormLabel>
+                        <FormControl><Input type="number" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="color"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cor</FormLabel>
+                        <FormControl><Input placeholder="ex.: Preto" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="luggageCapacity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Capacidade de Malas</FormLabel>
                         <FormControl><Input type="number" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
@@ -221,7 +250,9 @@ export default function VehiclesPage() {
             <TableRow>
               <TableHead>Modelo</TableHead>
               <TableHead>Placa</TableHead>
-              <TableHead>Capacidade</TableHead>
+              <TableHead>Capacidade PAX</TableHead>
+              <TableHead>Cor</TableHead>
+              <TableHead>Capacidade de Malas</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Ações</TableHead>
@@ -238,6 +269,8 @@ export default function VehiclesPage() {
                   <TableCell className="font-medium">{vehicle.model}</TableCell>
                   <TableCell className="font-mono text-xs">{vehicle.plate}</TableCell>
                   <TableCell>{vehicle.capacity} pax</TableCell>
+                  <TableCell>{vehicle.color || "—"}</TableCell>
+                  <TableCell>{Number(vehicle.luggageCapacity ?? 0)} malas</TableCell>
                   <TableCell>
                     {labelFromType(vehicle.type)}
                   </TableCell>

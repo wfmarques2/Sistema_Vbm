@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Plus, Search, Filter, Pencil, Trash2, CalendarIcon, ChevronDown, DollarSign, MoreHorizontal } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, CalendarIcon, ChevronDown, DollarSign, MoreHorizontal, Download } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { z } from "zod";
@@ -307,6 +307,48 @@ export default function ServicesPage() {
       s.destination.toLowerCase().includes(q);
     return matchesText;
   });
+
+  const exportServicesXlsx = () => {
+    const rows = (filteredServices || []).map((service: any) => {
+      const paxTotal =
+        Number(service.passengers || 0) > 0
+          ? Number(service.passengers || 0)
+          : Number(service.paxAdt || 0) +
+            Number(service.paxChd || 0) +
+            Number(service.paxInf || 0) +
+            Number(service.paxSen || 0) +
+            Number(service.paxFree || 0);
+      return {
+        "Data/Hora": format(new Date(service.dateTime), "dd/MM/yyyy HH:mm", { locale: ptBR }),
+        "Cliente": formatPassengerNames(service.clientName),
+        "Rota": `${service.origin} → ${service.destination}`,
+        "Motorista": service.driver?.name || "Não atribuído",
+        "Veículo": service.vehicle ? `${service.vehicle.model}${service.vehicle.plate ? ` (${service.vehicle.plate})` : ""}` : "Sem veículo",
+        "Voo": String(service.flight || ""),
+        "Qtde pax": paxTotal,
+        "Malas": Number(service.bags || 0),
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 18 },
+      { wch: 30 },
+      { wch: 52 },
+      { wch: 24 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 10 },
+      { wch: 10 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Serviços");
+    const suffix = `${start || "inicio"}_${end || "fim"}`.replace(/[^\d_]/g, "");
+    XLSX.writeFile(wb, `servicos_${suffix || "filtro"}.xlsx`);
+    toast({
+      title: "Exportação concluída",
+      description: `${rows.length} serviço(s) exportado(s).`,
+    });
+  };
 
   const typeLabel = (t: string) =>
     t === "corporate" ? "Executivo" :
@@ -724,6 +766,10 @@ export default function ServicesPage() {
             <Button variant="outline" className="gap-2" onClick={() => {}}>
               <Filter className="w-4 h-4" />
               Filtros
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={exportServicesXlsx}>
+              <Download className="w-4 h-4" />
+              Exportar XLSX
             </Button>
           </div>
         </div>

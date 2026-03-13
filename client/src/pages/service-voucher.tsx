@@ -7,6 +7,8 @@ import { api } from "@shared/routes";
 import vbmLogoUrl from "@assets/vbm-logo-1.png?url";
 import privativoIconUrl from "@assets/privativo.png?url";
 import executivoIconUrl from "@assets/executivo.png?url";
+import paxIconUrl from "@assets/pax_icon.png?url";
+import malaIconUrl from "@assets/mala_icon.png?url";
 import { ptBR, es } from "date-fns/locale";
 
 const translations = {
@@ -241,6 +243,17 @@ export default function ServiceVoucherPage() {
             </div>
             <div className="border-b mt-2 mb-3" />
 
+            <div className="flex items-center gap-5 text-[12px]">
+              <div className="inline-flex items-center gap-2">
+                <img src={paxIconUrl} alt="PAX" className="w-4 h-4 object-contain border border-neutral-100 rounded bg-neutral-50/50" />
+                <span>Qtde pax: <span className="font-medium">{Number(service.passengers ?? 0) || (Number.isFinite(totalPax) ? totalPax : 0)}</span></span>
+              </div>
+              <div className="inline-flex items-center gap-2">
+                <img src={malaIconUrl} alt="Malas" className="w-4 h-4 object-contain border border-neutral-100 rounded bg-neutral-50/50" />
+                <span>Malas: <span className="font-medium">{Number(service.bags ?? 0) || 0}</span></span>
+              </div>
+            </div>
+
             <div className="mt-4 text-sm">
               <div className="font-semibold">{t.itineraryData}</div>
               <div className="grid grid-cols-3 gap-3 mt-2 border rounded p-3">
@@ -313,7 +326,13 @@ export default function ServiceVoucherPage() {
                 </div>
                 <div className="grid grid-cols-[110px_1fr]">
                   <div className="px-2 py-1 border-r text-neutral-600 cell">{t.origin}</div>
-                  <div className="px-2 py-1 leading-tight cell">{String(service.origin)}</div>
+                  <div className="px-2 py-1 leading-tight cell">
+                    {(() => {
+                      const origin = String(service.origin);
+                      const flight = String(service.flight || "").trim();
+                      return flight ? `${origin} - Voo: ${flight}` : origin;
+                    })()}
+                  </div>
                 </div>
                 <div className="grid grid-cols-[110px_1fr]">
                   <div className="px-2 py-1 border-r text-neutral-600 cell">{t.destination}</div>
@@ -358,7 +377,12 @@ export default function ServiceVoucherPage() {
                        const restanteCents = Math.max(0, Number(service.valorCobrado || 0) - pago);
                        const restanteFmt = (restanteCents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                        const pagoFmt = (pago / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                       const restoMetodo = service.restanteMetodo === "pay_driver" ? "ao motorista" : service.restanteMetodo === "pix" ? "PIX" : "";
+                       const restoMetodo =
+                         service.restanteMetodo === "pay_driver"
+                           ? `ao motorista${service.restanteMetodoDriver ? ` (${paymentLabel(service.restanteMetodoDriver)})` : ""}`
+                           : service.restanteMetodo === "pix"
+                           ? "PIX"
+                           : "";
                        return `Parcial • Pago: R$ ${pagoFmt}${restoMetodo ? ` • Restante (${restoMetodo}): R$ ${restanteFmt}` : ""}`;
                      })() :
                      service.statusPagamento === "pay_driver" ? "Pagar ao Motorista" : "—"}

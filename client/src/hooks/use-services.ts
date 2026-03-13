@@ -103,15 +103,43 @@ export function useUpdateService() {
         body: JSON.stringify(validated),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Falha ao atualizar serviço");
+      if (!res.ok) {
+        try {
+          const body = await res.json();
+          // Fallback: tentar via POST em /api/services/:id/update
+          const alt = await fetch(`/api/services/${id}/update`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(validated),
+            credentials: "include",
+          });
+          if (!alt.ok) {
+            try {
+              const altBody = await alt.json();
+              throw new Error(altBody?.message || body?.message || `Falha ao atualizar serviço (HTTP ${res.status}/${alt.status})`);
+            } catch {
+              throw new Error(body?.message || `Falha ao atualizar serviço (HTTP ${res.status}/${alt.status})`);
+            }
+          }
+          return api.services.update.responses[200].parse(await alt.json());
+        } catch {
+          throw new Error(`Falha ao atualizar serviço (HTTP ${res.status})`);
+        }
+      }
       return api.services.update.responses[200].parse(await res.json());
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [api.services.list.path] });
+    onSuccess: (updated, variables) => {
+      // Invalida TODAS as queries de serviços, independentemente dos filtros
+      const all = queryClient.getQueryCache().findAll({ queryKey: [api.services.list.path] });
+      all.forEach((q) => {
+        queryClient.invalidateQueries({ queryKey: q.queryKey as any });
+      });
       queryClient.invalidateQueries({ queryKey: [api.stats.get.path] });
       // Atualiza saldos em Clientes quando um serviço altera pagamento (ex.: saldo)
       queryClient.invalidateQueries({ queryKey: [api.clients.list.path] });
       if (variables?.id) {
+        // Atualiza cache do serviço específico imediatamente
+        queryClient.setQueryData([api.services.get.path, variables.id], updated);
         queryClient.invalidateQueries({ queryKey: ["/api/financial/services/:id/profit", variables.id] });
       }
       toast({ title: "Sucesso", description: "Serviço atualizado com sucesso" });

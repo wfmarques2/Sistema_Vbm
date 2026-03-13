@@ -13,8 +13,9 @@ import { useDrivers } from "@/hooks/use-drivers";
 import { useVehicles } from "@/hooks/use-vehicles";
 import { useClients, useClientDependents, useCreateClientDependent } from "@/hooks/use-clients";
 import { useRoute, useLocation } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { api } from "@shared/routes";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
 export default function ServiceEditPage() {
@@ -28,6 +29,8 @@ export default function ServiceEditPage() {
   const { data: clients } = useClients();
   const createMutation = useCreateService();
   const updateMutation = useUpdateService();
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
 
   const [valueDisplay, setValueDisplay] = useState("R$ 0,00");
   const [dateTimeInput, setDateTimeInput] = useState<string>("");
@@ -53,7 +56,7 @@ export default function ServiceEditPage() {
     s === "finished" ? "Finalizado" :
     s === "canceled" ? "Cancelado" : s;
 
-  const serviceFormSchema = insertServiceSchema.extend({
+  const serviceFormSchema = (isEdit ? insertServiceSchema.partial() : insertServiceSchema).extend({
     driverId: z.union([z.string(), z.number()]).nullable().optional(),
     vehicleId: z.union([z.string(), z.number()]).nullable().optional(),
     clientId: z.union([z.string(), z.number()]).nullable().optional(),
@@ -82,6 +85,9 @@ export default function ServiceEditPage() {
       kmPrevisto: "",
       notes: "",
       guide: "",
+      flight: "",
+      passengers: 0,
+      bags: 0,
     },
   });
 
@@ -101,6 +107,8 @@ export default function ServiceEditPage() {
       form.reset({
         ...service,
         paymentMethod: paymentMethodNorm,
+        statusPagamento: service.statusPagamento || "pending",
+        status: service.status || "scheduled",
         value: amount.toFixed(2),
         driverId: service.driverId?.toString(),
         vehicleId: service.vehicleId?.toString(),
@@ -109,6 +117,7 @@ export default function ServiceEditPage() {
         returnDateTime: service.returnDateTime ? new Date(service.returnDateTime) : undefined,
         kmPrevisto: service.kmPrevisto != null ? String(service.kmPrevisto) : "",
         guide: service.guide ?? "",
+        restanteMetodoDriver: service.restanteMetodoDriver ?? undefined,
       });
       setDateTimeInput(format(new Date(service.dateTime), "yyyy-MM-dd'T'HH:mm"));
       setReturnInput(service.returnDateTime ? format(new Date(service.returnDateTime), "yyyy-MM-dd'T'HH:mm") : "");
@@ -183,25 +192,54 @@ export default function ServiceEditPage() {
       clientPhone: clientPhoneFinal || values.clientPhone,
       value: normalized,
       kmPrevisto: values.kmPrevisto != null && values.kmPrevisto !== "" ? String(values.kmPrevisto).replace(",", ".") : undefined,
-      driverId: values.driverId ? parseInt(values.driverId) : null,
-      vehicleId: values.vehicleId ? parseInt(values.vehicleId) : null,
-      clientId: values.clientId ? parseInt(values.clientId) : null,
+      driverId: values.driverId ? parseInt(values.driverId) : undefined,
+      vehicleId: values.vehicleId ? parseInt(values.vehicleId) : undefined,
+      clientId: values.clientId ? parseInt(values.clientId) : undefined,
       dateTime: new Date(values.dateTime),
       returnDateTime: values.returnDateTime ? new Date(values.returnDateTime as any) : undefined,
       guide: values.guide ? String(values.guide).trim() : undefined,
+      flight: values.flight ? String(values.flight).trim() : undefined,
+      passengers: Number(values.passengers ?? 0) || undefined,
+      bags: Number(values.bags ?? 0) || undefined,
       valorPagoParcial: (() => {
         const display = String(valorParcialDisplay || "").replace(/\D/g, "");
         return display ? parseInt(display, 10) : undefined;
       })(),
       restanteMetodo: values.restanteMetodo || undefined,
+      restanteMetodoDriver: values.restanteMetodo === "pay_driver" ? values.restanteMetodoDriver || undefined : undefined,
     };
 
-    if (isEdit && id) {
-      await updateMutation.mutateAsync({ id, ...payload });
-    } else {
-      await createMutation.mutateAsync(payload);
+    try {
+      setSaving(true);
+      toast({ title: isEdit ? "Atualizando serviço" : "Criando serviço", description: "Enviando dados..." });
+      if (isEdit && id) {
+        await updateMutation.mutateAsync({ id, ...payload });
+      } else {
+        await createMutation.mutateAsync(payload);
+      }
+      navigate("/services");
+    } catch (err: any) {
+      toast({
+        title: "Erro",
+        description: String(err?.message || "Falha ao salvar serviço"),
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
     }
-    navigate("/services");
+  };
+
+  const onInvalid = (errors: any) => {
+    const firstField = Object.keys(errors || {})[0];
+    const firstMessage =
+      (firstField && (errors as any)?.[firstField]?.message)
+        ? String((errors as any)[firstField].message)
+        : "Preencha os campos obrigatórios";
+    toast({
+      title: "Formulário inválido",
+      description: firstMessage,
+      variant: "destructive",
+    });
   };
 
   return (
@@ -212,7 +250,7 @@ export default function ServiceEditPage() {
       </div>
       <div className="max-w-4xl">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="clientName" render={({ field }) => (
                 <FormItem><FormLabel>Nome do Cliente</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -310,6 +348,65 @@ export default function ServiceEditPage() {
                 <FormMessage />
               </FormItem>
             )} />
+            <div className="grid grid-cols-3 gap-4">
+              <FormField control={form.control} name="flight" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Voo</FormLabel>
+                  <FormControl><Input value={field.value ?? ""} onChange={field.onChange} placeholder="Ex.: G3 1234" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="passengers" render={({ field }) => {
+                const selectedVehicleId = Number(form.watch("vehicleId") || 0);
+                const selectedVehicle = (vehicles || []).find(v => v.id === selectedVehicleId);
+                const maxPax = selectedVehicle ? Number(selectedVehicle.capacity || 0) : undefined;
+                return (
+                  <FormItem>
+                    <FormLabel>Qtde pax</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={maxPax ?? undefined}
+                        value={String(field.value ?? 0)}
+                        onChange={(e) => {
+                          let val = parseInt(e.target.value || "0", 10);
+                          if (!Number.isFinite(val) || val < 0) val = 0;
+                          if (maxPax != null) val = Math.min(val, maxPax);
+                          field.onChange(val);
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }} />
+              <FormField control={form.control} name="bags" render={({ field }) => {
+                const selectedVehicleId = Number(form.watch("vehicleId") || 0);
+                const selectedVehicle = (vehicles || []).find(v => v.id === selectedVehicleId);
+                const maxBags = selectedVehicle ? Number(selectedVehicle.luggageCapacity || 0) : undefined;
+                return (
+                  <FormItem>
+                    <FormLabel>Malas</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={maxBags ?? undefined}
+                        value={String(field.value ?? 0)}
+                        onChange={(e) => {
+                          let val = parseInt(e.target.value || "0", 10);
+                          if (!Number.isFinite(val) || val < 0) val = 0;
+                          if (maxBags != null) val = Math.min(val, maxBags);
+                          field.onChange(val);
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }} />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="origin" render={({ field }) => (
                 <FormItem><FormLabel>Origem</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -398,6 +495,23 @@ export default function ServiceEditPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
+                {form.watch("restanteMetodo") === "pay_driver" && (
+                  <FormField control={form.control} name="restanteMetodoDriver" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Método ao Motorista</FormLabel>
+                      <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione o método" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="pix">PIX</SelectItem>
+                          <SelectItem value="cash">Dinheiro</SelectItem>
+                          <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                          <SelectItem value="debit_card">Cartão de Débito</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
               </div>
             )}
             <div className="grid grid-cols-2 gap-4">
@@ -427,15 +541,48 @@ export default function ServiceEditPage() {
               <FormField control={form.control} name="vehicleId" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Veículo</FormLabel>
-                  <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Atribuir veículo" /></SelectTrigger></FormControl>
-                    <SelectContent>{vehicles?.map(v => <SelectItem key={v.id} value={v.id.toString()}>{v.model} ({v.plate})</SelectItem>)}</SelectContent>
-                  </Select>
+                  {(() => {
+                    const paxWatch = Number(form.watch("passengers") || 0);
+                    const bagsWatch = Number(form.watch("bags") || 0);
+                    const filteredVehicles = useMemo(() => {
+                      return (vehicles || []).filter(v => {
+                        const okPax = paxWatch > 0 ? Number(v.capacity || 0) >= paxWatch : true;
+                        const okBags = bagsWatch > 0 ? Number(v.luggageCapacity || 0) >= bagsWatch : true;
+                        return okPax && okBags;
+                      });
+                    }, [vehicles, paxWatch, bagsWatch]);
+                    return (
+                      <Select
+                        onValueChange={(val) => {
+                          field.onChange(val);
+                          const vObj = (vehicles || []).find(v => String(v.id) === String(val));
+                          if (vObj) {
+                            const maxPax = Number(vObj.capacity || 0);
+                            const maxBags = Number(vObj.luggageCapacity || 0);
+                            const currentPax = Number(form.getValues("passengers") || 0);
+                            const currentBags = Number(form.getValues("bags") || 0);
+                            if (currentPax > maxPax) form.setValue("passengers", maxPax);
+                            if (currentBags > maxBags) form.setValue("bags", maxBags);
+                          }
+                        }}
+                        value={String(field.value ?? "")}
+                      >
+                        <FormControl><SelectTrigger><SelectValue placeholder="Atribuir veículo" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {filteredVehicles.map(v => <SelectItem key={v.id} value={v.id.toString()}>{v.model} ({v.plate})</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    );
+                  })()}
                   <FormMessage />
                 </FormItem>
               )} />
             </div>
-            <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+            <Button
+              type="button"
+              className="w-full"
+              onClick={() => form.handleSubmit(onSubmit, onInvalid)()}
+            >
               {isEdit ? "Atualizar Serviço" : "Criar Serviço"}
             </Button>
           </form>
