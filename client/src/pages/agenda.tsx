@@ -133,7 +133,10 @@ export default function AgendaPage() {
 
   const statusLabel = (s: string) =>
     s === "scheduled" ? "Agendado" :
-    s === "in_progress" ? "Em andamento" :
+    s === "driving_pickup" ? "Direção embarque" :
+    s === "pickup_location" ? "Local embarque" :
+    s === "driving_destination" ? "Direção destino" :
+    s === "in_progress" ? "Direção destino" :
     s === "finished" ? "Finalizado" :
     s === "canceled" ? "Cancelado" : s;
 
@@ -223,8 +226,10 @@ export default function AgendaPage() {
                       </div>
                       <div className={`px-2 py-1 rounded text-xs font-medium 
                         ${service.status === 'finished' ? 'bg-green-100 text-green-700' : 
-                          service.status === 'in_progress' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-blue-50 text-blue-700'}`
+                          service.status === 'driving_pickup' ? 'bg-yellow-100 text-yellow-700' :
+                          service.status === 'pickup_location' ? 'bg-orange-100 text-orange-700' :
+                          service.status === 'driving_destination' || String(service.status) === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                          'bg-purple-100 text-purple-700'}`
                       }>
                         {statusLabel(service.status)}
                       </div>
@@ -264,13 +269,27 @@ export default function AgendaPage() {
               // marcação simples no objeto para evitar reinit loops
               setCosts((prev: any) => ({ ...prev, __initFrom: s.id }));
             }
-            const canStart = s.status === "scheduled";
-            const canFinish = s.status === "in_progress";
+            const canAdvance = ["scheduled", "driving_pickup", "pickup_location", "driving_destination", "in_progress"].includes(String(s.status));
+            const nextStatus = s.status === "scheduled"
+              ? "driving_pickup"
+              : s.status === "driving_pickup"
+              ? "pickup_location"
+              : s.status === "pickup_location"
+              ? "driving_destination"
+              : String(s.status) === "in_progress"
+              ? "finished"
+              : s.status === "driving_destination"
+              ? "finished"
+              : null;
+            const canFinish = s.status === "driving_destination" || String(s.status) === "in_progress";
             const isFinished = s.status === "finished";
             const canCancel = !isFinished;
             const statusClass =
               s.status === "finished" ? "bg-green-100 text-green-700" :
-              s.status === "in_progress" ? "bg-yellow-100 text-yellow-700" : "bg-blue-50 text-blue-700";
+              s.status === "driving_pickup" ? "bg-yellow-100 text-yellow-700" :
+              s.status === "pickup_location" ? "bg-orange-100 text-orange-700" :
+              s.status === "driving_destination" || String(s.status) === "in_progress" ? "bg-blue-100 text-blue-700" :
+              "bg-purple-100 text-purple-700";
             const originUrlWaze = `https://waze.com/ul?q=${encodeURIComponent(s.origin)}&navigate=yes`;
             const originUrlGmaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.origin)}`;
             const destUrlWaze = `https://waze.com/ul?q=${encodeURIComponent(s.destination)}&navigate=yes`;
@@ -332,17 +351,18 @@ export default function AgendaPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3 mt-4">
                     <Button 
-                      disabled={!canStart || updateMutation.isPending}
+                      disabled={!canAdvance || !nextStatus || updateMutation.isPending}
                       onClick={async () => {
-                        const ok = window.confirm("Deseja iniciar a viagem agora?");
+                        if (!nextStatus) return;
+                        const ok = window.confirm(`Deseja avançar o status para "${statusLabel(nextStatus)}"?`);
                         if (!ok) return;
-                        await updateMutation.mutateAsync({ id: serviceId, status: "in_progress" });
+                        await updateMutation.mutateAsync({ id: serviceId, status: nextStatus as any });
                         setOpenServiceId(null);
                       }}
                       className="bg-[#d4af37] text-black hover:bg-[#c39a2f]"
                       style={{ width: "100%" }}
                     >
-                      Iniciar viagem
+                      {nextStatus ? `Avançar: ${statusLabel(nextStatus)}` : "Sem próximo status"}
                     </Button>
                     <Button 
                       disabled={!canFinish || updateMutation.isPending}

@@ -19,7 +19,10 @@ export default function DriverHistoryPage() {
 
   const statusLabel = (s: string) =>
     s === "scheduled" ? "Agendado" :
-    s === "in_progress" ? "Em andamento" :
+    s === "driving_pickup" ? "Direção embarque" :
+    s === "pickup_location" ? "Local embarque" :
+    s === "driving_destination" ? "Direção destino" :
+    s === "in_progress" ? "Direção destino" :
     s === "finished" ? "Finalizado" :
     s === "canceled" ? "Cancelado" : s;
 

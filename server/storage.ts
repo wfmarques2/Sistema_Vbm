@@ -269,7 +269,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(services.driverId, filters.driverId));
     }
     if (filters?.status) {
-      const allowed = ["scheduled","in_progress","finished","canceled"] as const;
+      const allowed = ["scheduled","driving_pickup","pickup_location","driving_destination","finished","canceled"] as const;
       if (allowed.includes(filters.status as typeof allowed[number])) {
         conditions.push(eq(services.status, filters.status as typeof allowed[number]));
       }

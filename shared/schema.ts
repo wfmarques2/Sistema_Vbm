@@ -12,7 +12,7 @@ export const vehicleStatusEnum = ["available", "in_use", "maintenance"] as const
 export const vehicleTypeEnum = ["sedan","suv","minivan","van","micro_onibus","onibus","blindado"] as const;
 export const serviceTypeEnum = ["airport", "corporate", "city_tour", "hourly"] as const;
 export const paymentMethodEnum = ["pix", "cash", "credit_card", "debit_card", "saldo"] as const;
-export const serviceStatusEnum = ["scheduled", "in_progress", "finished", "canceled"] as const;
+export const serviceStatusEnum = ["scheduled", "driving_pickup", "pickup_location", "driving_destination", "finished", "canceled"] as const;
 // Status de pagamento para controles financeiros
 export const paymentStatusEnum = ["pending", "paid", "saldo", "partial", "overdue", "canceled", "pay_driver"] as const;
 // Método de pagamento para o restante em caso de pagamento parcial

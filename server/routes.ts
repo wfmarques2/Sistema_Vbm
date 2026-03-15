@@ -269,7 +269,7 @@ export async function registerRoutes(
       if (m === "PUT" && /^\/api\/services\/\d+$/.test(p)) {
         const body = req.body || {};
         const keys = Object.keys(body);
-        const allowedStatuses = ["in_progress", "finished", "canceled"];
+        const allowedStatuses = ["driving_pickup", "pickup_location", "driving_destination", "finished", "canceled"];
         if (!(keys.length === 1 && keys[0] === "status" && allowedStatuses.includes(body.status))) {
           return res.status(403).json({ message: "Ação não permitida para Motorista" });
         }
@@ -872,7 +872,7 @@ export async function registerRoutes(
       if (filters.driverId) conditions.push(eq(services.driverId, filters.driverId));
       if (filters.vehicleId) conditions.push(eq(services.vehicleId, filters.vehicleId));
       if (filters.status) {
-        const allowed = ["scheduled","in_progress","finished","canceled"] as const;
+        const allowed = ["scheduled","driving_pickup","pickup_location","driving_destination","finished","canceled"] as const;
         if (allowed.includes(filters.status as typeof allowed[number])) {
           conditions.push(eq(services.status, filters.status as typeof allowed[number]));
         }

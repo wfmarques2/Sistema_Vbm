@@ -374,7 +374,10 @@ export default function ServicesPage() {
 
   const statusLabel = (s: string) =>
     s === "scheduled" ? "Agendado" :
-    s === "in_progress" ? "Em andamento" :
+    s === "driving_pickup" ? "Direção embarque" :
+    s === "pickup_location" ? "Local embarque" :
+    s === "driving_destination" ? "Direção destino" :
+    s === "in_progress" ? "Direção destino" :
     s === "finished" ? "Finalizado" :
     s === "canceled" ? "Cancelado" : s;
 
@@ -390,8 +393,11 @@ export default function ServicesPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "scheduled": return <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200">Agendado</Badge>;
-      case "in_progress": return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">Em andamento</Badge>;
+      case "scheduled": return <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-200">Agendado</Badge>;
+      case "driving_pickup": return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">Direção embarque</Badge>;
+      case "pickup_location": return <Badge variant="secondary" className="bg-orange-100 text-orange-800 hover:bg-orange-200">Local embarque</Badge>;
+      case "driving_destination": return <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200">Direção destino</Badge>;
+      case "in_progress": return <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200">Direção destino</Badge>;
       case "finished": return <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">Finalizado</Badge>;
       case "canceled": return <Badge variant="destructive">Cancelado</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
@@ -511,12 +517,20 @@ export default function ServicesPage() {
                 const statusMap: Record<string, string> = {
                   "agendado": "scheduled",
                   "scheduled": "scheduled",
+                  "direção embarque": "driving_pickup",
+                  "direcao embarque": "driving_pickup",
+                  "driving pickup": "driving_pickup",
+                  "local embarque": "pickup_location",
+                  "pickup location": "pickup_location",
+                  "direção destino": "driving_destination",
+                  "direcao destino": "driving_destination",
+                  "driving destination": "driving_destination",
                   "finalizado": "finished",
                   "finished": "finished",
                   "cancelado": "canceled",
                   "canceled": "canceled",
-                  "em andamento": "in_progress",
-                  "in progress": "in_progress",
+                  "em andamento": "driving_destination",
+                  "in progress": "driving_destination",
                 };
                 const st = statusMap[status] || "scheduled";
                 const driverId = drivers?.find(d => d.name.toLowerCase() === driverName.toLowerCase())?.id;
@@ -800,7 +814,9 @@ export default function ServicesPage() {
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="scheduled">Agendado</SelectItem>
-                  <SelectItem value="in_progress">Em andamento</SelectItem>
+                  <SelectItem value="driving_pickup">Direção embarque</SelectItem>
+                  <SelectItem value="pickup_location">Local embarque</SelectItem>
+                  <SelectItem value="driving_destination">Direção destino</SelectItem>
                   <SelectItem value="finished">Finalizado</SelectItem>
                   <SelectItem value="canceled">Cancelado</SelectItem>
                 </SelectContent>

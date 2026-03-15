@@ -235,24 +235,12 @@ export default function ServiceVoucherPage() {
                     <div className="text-xs font-semibold">{t.embarkationOrder}</div>
                     <div className="text-[10px] mt-0.5">{t.itinerary.toUpperCase()}</div>
                     <div className="text-sm font-medium leading-none">{String(service.id).padStart(6, "0")}</div>
-                    <div className="text-[9px] mt-0.5">{t.issuedAt} {format(new Date(), "dd/MM/yyyy HH:mm", { locale: dateLocale })}</div>
                   </div>
                   <img src={qrUrl} alt={`QR Itinerário ${service.id}`} style={{ width: "20mm", height: "20mm" }} />
                 </div>
               </div>
             </div>
             <div className="border-b mt-2 mb-3" />
-
-            <div className="flex items-center gap-5 text-[12px]">
-              <div className="inline-flex items-center gap-2">
-                <img src={paxIconUrl} alt="PAX" className="w-4 h-4 object-contain border border-neutral-100 rounded bg-neutral-50/50" />
-                <span>Qtde pax: <span className="font-medium">{Number(service.passengers ?? 0) || (Number.isFinite(totalPax) ? totalPax : 0)}</span></span>
-              </div>
-              <div className="inline-flex items-center gap-2">
-                <img src={malaIconUrl} alt="Malas" className="w-4 h-4 object-contain border border-neutral-100 rounded bg-neutral-50/50" />
-                <span>Malas: <span className="font-medium">{Number(service.bags ?? 0) || 0}</span></span>
-              </div>
-            </div>
 
             <div className="mt-4 text-sm">
               <div className="font-semibold">{t.itineraryData}</div>
@@ -390,8 +378,18 @@ export default function ServiceVoucherPage() {
                   </div>
                 </div>
               </div>
-              <div className="text-xs mt-1">
+              <div className="text-xs mt-1 flex items-center justify-between gap-4">
                 <span className="text-red-600">{t.phone} {service.clientPhone || "-"}</span>
+                <div className="inline-flex items-center gap-4">
+                  <div className="inline-flex items-center gap-2">
+                    <img src={paxIconUrl} alt="PAX" className="w-4 h-4 object-contain border border-neutral-100 rounded bg-neutral-50/50" />
+                    <span>Qtde pax: <span className="font-medium">{Number(service.passengers ?? 0) || (Number.isFinite(totalPax) ? totalPax : 0)}</span></span>
+                  </div>
+                  <div className="inline-flex items-center gap-2">
+                    <img src={malaIconUrl} alt="Malas" className="w-4 h-4 object-contain border border-neutral-100 rounded bg-neutral-50/50" />
+                    <span>Malas: <span className="font-medium">{Number(service.bags ?? 0) || 0}</span></span>
+                  </div>
+                </div>
               </div>
               <div className="flex justify-between items-center text-[12px] mt-2">
                 <div className="flex gap-6 items-center">
@@ -475,7 +473,7 @@ export default function ServiceVoucherPage() {
             
 
             <div className="mt-6 text-xs flex justify-between">
-              <div>{format(new Date(), "dd/MM/yyyy HH:mm", { locale: dateLocale })}</div>
+              <div></div>
               <div>{t.page} 1 {t.of} 1</div>
             </div>
           </div>
