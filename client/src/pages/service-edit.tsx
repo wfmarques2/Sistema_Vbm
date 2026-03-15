@@ -11,7 +11,7 @@ import { z } from "zod";
 import { useCreateService, useUpdateService } from "@/hooks/use-services";
 import { useDrivers } from "@/hooks/use-drivers";
 import { useVehicles } from "@/hooks/use-vehicles";
-import { useClients, useClientDependents, useCreateClientDependent } from "@/hooks/use-clients";
+import { useClients, useClientDependents, useCreateClient, useCreateClientDependent } from "@/hooks/use-clients";
 import { useRoute, useLocation } from "wouter";
 import { useEffect, useState, useMemo } from "react";
 import { api } from "@shared/routes";
@@ -27,6 +27,7 @@ export default function ServiceEditPage() {
   const { data: drivers } = useDrivers();
   const { data: vehicles } = useVehicles();
   const { data: clients } = useClients();
+  const createClient = useCreateClient();
   const createMutation = useCreateService();
   const updateMutation = useUpdateService();
   const { toast } = useToast();
@@ -141,6 +142,8 @@ export default function ServiceEditPage() {
   const [depSelectedId, setDepSelectedId] = useState<number>(0);
   const [newDepName, setNewDepName] = useState("");
   const [newDepPhone, setNewDepPhone] = useState("");
+  const [extraDependentId, setExtraDependentId] = useState<number>(0);
+  const [extraPassengers, setExtraPassengers] = useState<Array<{ name: string; phone?: string }>>([]);
   useEffect(() => {
     const idNum = Number(selectedClientId);
     if (!clients || !Number.isFinite(idNum) || idNum <= 0) return;
@@ -151,6 +154,8 @@ export default function ServiceEditPage() {
     setDepSelectedId(0);
     setNewDepName("");
     setNewDepPhone("");
+    setExtraDependentId(0);
+    setExtraPassengers([]);
   }, [selectedClientId, clients]);
 
   const onSubmit = async (values: any) => {
@@ -163,6 +168,33 @@ export default function ServiceEditPage() {
       return Number.isFinite(num) ? num.toFixed(2) : "0";
     })();
 
+    const digits = (s?: string) => String(s || "").replace(/\D/g, "");
+    let clientIdFinal = values.clientId ? parseInt(values.clientId) : undefined;
+    if (!clientIdFinal) {
+      const nameInput = String(values.clientName || "").trim();
+      const phoneInput = String(values.clientPhone || "").trim();
+      if (nameInput || phoneInput) {
+        const phoneDigits = digits(phoneInput);
+        const existing = (clients || []).find((c: any) => {
+          const samePhone = phoneDigits ? digits(c.phone) === phoneDigits : false;
+          const sameName = String(c.name || "").trim().toLowerCase() === nameInput.toLowerCase();
+          return samePhone || sameName;
+        });
+        if (existing) {
+          clientIdFinal = Number(existing.id);
+        } else {
+          const created = await createClient.mutateAsync({
+            name: nameInput || "Cliente",
+            phone: phoneInput || "",
+            email: "",
+            nationality: "",
+            balanceCentavos: 0,
+          } as any);
+          clientIdFinal = Number(created.id);
+        }
+      }
+    }
+
     // Se houver dependente selecionado, usa os dados dele como passageiro.
     let clientNameFinal = String(values.clientName || "").trim();
     let clientPhoneFinal = String(values.clientPhone || "").trim();
@@ -173,36 +205,65 @@ export default function ServiceEditPage() {
         clientPhoneFinal = dep.phone || clientPhoneFinal;
       }
     }
-    // Se preencher manualmente novo dependente, cria e passa a usá-lo
-    if (selectedClientIdNum > 0 && depSelectedId === 0 && newDepName.trim()) {
-      try {
-        const created = await createDependent.mutateAsync({
-          clientId: selectedClientIdNum,
-          name: newDepName.trim(),
-          phone: newDepPhone.trim() || undefined,
-        } as any);
-        clientNameFinal = created?.name || newDepName.trim();
-        clientPhoneFinal = created?.phone || clientPhoneFinal;
-      } catch {
-        clientNameFinal = newDepName.trim();
-        clientPhoneFinal = newDepPhone.trim() || clientPhoneFinal;
+    const normalizedExtra = Array.from(
+      new Map(
+        extraPassengers
+          .map((p) => ({ name: String(p.name || "").trim(), phone: String(p.phone || "").trim() }))
+          .filter((p) => p.name)
+          .map((p) => [`${p.name.toLowerCase()}|${digits(p.phone)}`, p])
+      ).values()
+    );
+    const resolvedExtraNames: string[] = [];
+    for (const p of normalizedExtra) {
+      if ((clientIdFinal || 0) > 0) {
+        const existing = (dependents || []).find((d: any) => {
+          const sameName = String(d.name || "").trim().toLowerCase() === p.name.toLowerCase();
+          const samePhone = digits(d.phone) === digits(p.phone);
+          return sameName && (samePhone || !p.phone);
+        });
+        if (existing) {
+          resolvedExtraNames.push(String(existing.name || p.name));
+          continue;
+        }
+        try {
+          const created = await createDependent.mutateAsync({
+            clientId: Number(clientIdFinal),
+            name: p.name,
+            phone: p.phone || undefined,
+          } as any);
+          resolvedExtraNames.push(String(created?.name || p.name));
+        } catch {
+          resolvedExtraNames.push(p.name);
+        }
+      } else {
+        resolvedExtraNames.push(p.name);
       }
     }
+    const passengerNames = Array.from(
+      new Set(
+        [clientNameFinal, ...resolvedExtraNames]
+          .map((n) => String(n || "").trim())
+          .filter(Boolean)
+      )
+    );
+    const passengerCountFromNames = passengerNames.length;
+    const manualPassengerCount = Number(values.passengers ?? 0) || 0;
+    const passengersFinal = Math.max(manualPassengerCount, passengerCountFromNames);
 
     const payload = {
       ...values,
-      clientName: clientNameFinal || values.clientName,
+      clientName: passengerNames.join(" & ") || values.clientName,
       clientPhone: clientPhoneFinal || values.clientPhone,
       value: normalized,
       kmPrevisto: values.kmPrevisto != null && values.kmPrevisto !== "" ? String(values.kmPrevisto).replace(",", ".") : undefined,
       driverId: values.driverId ? parseInt(values.driverId) : undefined,
       vehicleId: values.vehicleId ? parseInt(values.vehicleId) : undefined,
-      clientId: values.clientId ? parseInt(values.clientId) : undefined,
+      clientId: clientIdFinal,
       dateTime: new Date(values.dateTime),
       returnDateTime: values.returnDateTime ? new Date(values.returnDateTime as any) : undefined,
       guide: values.guide ? String(values.guide).trim() : undefined,
       flight: values.flight ? String(values.flight).trim() : undefined,
-      passengers: Number(values.passengers ?? 0) || undefined,
+      passengers: passengersFinal || undefined,
       bags: Number(values.bags ?? 0) || undefined,
       valorPagoParcial: (() => {
         const display = String(valorParcialDisplay || "").replace(/\D/g, "");
@@ -275,29 +336,99 @@ export default function ServiceEditPage() {
               </FormItem>
             )} />
             {Number(selectedClientId || 0) > 0 && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Dependente (passageiro)</label>
-                  <Select value={String(depSelectedId)} onValueChange={(v) => setDepSelectedId(Number(v))}>
-                    <SelectTrigger><SelectValue placeholder="Selecione o dependente" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">— Titular ({form.watch("clientName") || "Cliente"}) —</SelectItem>
-                      {(dependents || []).map((d: any) => (
-                        <SelectItem key={d.id} value={String(d.id)}>{d.name}{d.phone ? ` (${d.phone})` : ""}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">Novo dependente (nome)</label>
+                    <label className="text-sm font-medium">Passageiro principal</label>
+                    <Select value={String(depSelectedId)} onValueChange={(v) => setDepSelectedId(Number(v))}>
+                      <SelectTrigger><SelectValue placeholder="Selecione o passageiro" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">— Titular ({form.watch("clientName") || "Cliente"}) —</SelectItem>
+                        {(dependents || []).map((d: any) => (
+                          <SelectItem key={d.id} value={String(d.id)}>{d.name}{d.phone ? ` (${d.phone})` : ""}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Adicionar dependente existente</label>
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <Select value={String(extraDependentId)} onValueChange={(v) => setExtraDependentId(Number(v))}>
+                        <SelectTrigger><SelectValue placeholder="Selecione dependente" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Selecione</SelectItem>
+                          {(dependents || []).map((d: any) => (
+                            <SelectItem key={d.id} value={String(d.id)}>{d.name}{d.phone ? ` (${d.phone})` : ""}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          if (!extraDependentId) return;
+                          const dep = (dependents || []).find((d: any) => Number(d.id) === Number(extraDependentId));
+                          if (!dep) return;
+                          const depName = String(dep.name || "").trim();
+                          if (!depName) return;
+                          const depPhone = String(dep.phone || "").trim();
+                          const exists = extraPassengers.some((p) => String(p.name || "").trim().toLowerCase() === depName.toLowerCase() && String(p.phone || "").replace(/\D/g, "") === depPhone.replace(/\D/g, ""));
+                          if (!exists) {
+                            setExtraPassengers((prev) => [...prev, { name: depName, phone: depPhone || undefined }]);
+                          }
+                          setExtraDependentId(0);
+                        }}
+                      >
+                        Adicionar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_220px_auto] gap-2">
+                  <div>
+                    <label className="text-sm font-medium">Novo passageiro (nome)</label>
                     <Input value={newDepName} onChange={(e) => setNewDepName(e.target.value)} placeholder="Nome completo" />
                   </div>
                   <div>
                     <label className="text-sm font-medium">Telefone (opcional)</label>
                     <Input value={newDepPhone} onChange={(e) => setNewDepPhone(e.target.value)} placeholder="(11) 99999-9999" />
                   </div>
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => {
+                        const name = newDepName.trim();
+                        if (!name) return;
+                        const phone = newDepPhone.trim();
+                        const exists = extraPassengers.some((p) => String(p.name || "").trim().toLowerCase() === name.toLowerCase() && String(p.phone || "").replace(/\D/g, "") === phone.replace(/\D/g, ""));
+                        if (!exists) {
+                          setExtraPassengers((prev) => [...prev, { name, phone: phone || undefined }]);
+                        }
+                        setNewDepName("");
+                        setNewDepPhone("");
+                      }}
+                    >
+                      Adicionar passageiro
+                    </Button>
+                  </div>
                 </div>
+                {extraPassengers.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Passageiros adicionais</label>
+                    <div className="space-y-1">
+                      {extraPassengers.map((p, idx) => (
+                        <div key={`${p.name}-${p.phone || ""}-${idx}`} className="flex items-center justify-between rounded border border-border px-3 py-2 text-sm">
+                          <span>{p.name}{p.phone ? ` (${p.phone})` : ""}</span>
+                          <Button type="button" variant="ghost" onClick={() => setExtraPassengers((prev) => prev.filter((_, i) => i !== idx))}>
+                            Remover
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             <div className="grid grid-cols-2 gap-4">

@@ -1,5 +1,6 @@
 import { Layout } from "@/components/layout";
 import { useClients, useCreateClient, useUpdateClient, useDeleteClient, useClientDependents, useCreateClientDependent, useDeleteClientDependent } from "@/hooks/use-clients";
+import { useServices } from "@/hooks/use-services";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,17 +18,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Phone, Mail, UserPlus, Users } from "lucide-react";
-import { useState } from "react";
+import { Plus, Pencil, Trash2, Phone, Mail, Users, FileText, Download } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertClientSchema, insertClientDependentSchema } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import * as XLSX from "xlsx";
 
 export default function ClientsPage() {
   const { data: clients, isLoading } = useClients();
+  const { data: services } = useServices();
   const createMutation = useCreateClient();
   const updateMutation = useUpdateClient();
   const deleteMutation = useDeleteClient();
@@ -36,6 +42,7 @@ export default function ClientsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [initializedFromQuery, setInitializedFromQuery] = useState(false);
+  const [historyClientId, setHistoryClientId] = useState<number | null>(null);
 
   const form = useForm({
     resolver: zodResolver(insertClientSchema),
@@ -279,6 +286,14 @@ export default function ClientsPage() {
                   <TableCell>{client.completedTrips ?? 0}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setHistoryClientId(client.id)}
+                        title="Histórico de corridas"
+                      >
+                        <FileText className="w-4 h-4 text-primary" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(client)} title="Editar e Gerenciar Dependentes">
                         <Pencil className="w-4 h-4 text-blue-600" />
                       </Button>
@@ -293,7 +308,201 @@ export default function ClientsPage() {
           </TableBody>
         </Table>
       </div>
+      <Dialog
+        open={historyClientId != null}
+        onOpenChange={(v) => {
+          if (!v) setHistoryClientId(null);
+        }}
+      >
+        <DialogContent className="w-full max-w-6xl max-h-[88vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Histórico de corridas do cliente</DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const selected = (clients || []).find((c) => c.id === historyClientId);
+            if (!selected) return <div className="text-muted-foreground">Selecione um cliente.</div>;
+            return <ClientRideHistory client={selected} services={services || []} />;
+          })()}
+        </DialogContent>
+      </Dialog>
     </Layout>
+  );
+}
+
+function paymentLabel(p: string) {
+  return p === "pix" ? "PIX" :
+    p === "cash" ? "Dinheiro" :
+    p === "credit_card" ? "Cartão crédito" :
+    p === "debit_card" ? "Cartão débito" :
+    p === "saldo" ? "Saldo" : p || "-";
+}
+
+function statusLabel(s: string) {
+  return s === "scheduled" ? "Agendado" :
+    s === "driving_pickup" ? "Direção embarque" :
+    s === "pickup_location" ? "Local embarque" :
+    s === "driving_destination" ? "Direção destino" :
+    s === "in_progress" ? "Direção destino" :
+    s === "finished" ? "Finalizado" :
+    s === "canceled" ? "Cancelado" : s || "-";
+}
+
+function splitPassengerNames(name: string) {
+  return String(name || "")
+    .split("&")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+function ClientRideHistory({ client, services }: { client: any; services: any[] }) {
+  const { data: dependents } = useClientDependents(client.id);
+
+  const dependentNames = useMemo(() => {
+    return new Set((dependents || []).map((d: any) => String(d.name || "").trim().toLowerCase()));
+  }, [dependents]);
+
+  const rows = useMemo(() => {
+    const digits = (s: string) => String(s || "").replace(/\D/g, "");
+    const candidateNames = new Set<string>([
+      String(client.name || "").trim().toLowerCase(),
+      ...(dependents || []).map((d: any) => String(d.name || "").trim().toLowerCase()),
+    ]);
+    const clientPhoneDigits = digits(client.phone || "");
+    const filtered = (services || []).filter((s: any) => {
+      if (Number(s.clientId || 0) === Number(client.id)) return true;
+      const passengerNames = splitPassengerNames(String(s.clientName || "")).map((n) => n.toLowerCase());
+      const byName = passengerNames.some((n) => candidateNames.has(n));
+      if (byName) return true;
+      if (!clientPhoneDigits) return false;
+      return digits(String(s.clientPhone || "")) === clientPhoneDigits;
+    });
+    return filtered.sort((a: any, b: any) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+  }, [services, client, dependents]);
+
+  const totalValorCentavos = rows.reduce((acc: number, s: any) => {
+    const cents = Number(s.valorCobrado || 0) > 0 ? Number(s.valorCobrado || 0) : Math.round(Number(s.value || 0) * 100);
+    return acc + (Number.isFinite(cents) ? cents : 0);
+  }, 0);
+  const totalFinalizadas = rows.filter((s: any) => s.status === "finished").length;
+
+  const exportXlsx = () => {
+    const rowsExport = rows.map((s: any) => {
+      const passengers = splitPassengerNames(String(s.clientName || "")).join(", ");
+      const hasDependent = splitPassengerNames(String(s.clientName || "")).some((n) => dependentNames.has(n.toLowerCase()));
+      const cents = Number(s.valorCobrado || 0) > 0 ? Number(s.valorCobrado || 0) : Math.round(Number(s.value || 0) * 100);
+      return {
+        "Data/Hora": format(new Date(s.dateTime), "dd/MM/yyyy HH:mm", { locale: ptBR }),
+        "Passageiro(s)": passengers || s.clientName || "-",
+        "Perfil de Passageiro": hasDependent ? "Inclui dependente" : "Titular",
+        "Origem": s.origin || "-",
+        "Destino": s.destination || "-",
+        "Status": statusLabel(String(s.status || "")),
+        "Pagamento": paymentLabel(String(s.formaPagamento || s.paymentMethod || "")),
+        "Motorista": s.driver?.name || "Não atribuído",
+        "Veículo": s.vehicle ? `${s.vehicle.model}${s.vehicle.plate ? ` (${s.vehicle.plate})` : ""}` : "Sem veículo",
+        "Valor": (cents / 100).toFixed(2),
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rowsExport);
+    ws["!cols"] = [
+      { wch: 18 },
+      { wch: 34 },
+      { wch: 20 },
+      { wch: 42 },
+      { wch: 42 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 24 },
+      { wch: 26 },
+      { wch: 12 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Histórico");
+    const safe = String(client.name || "cliente").replace(/[^a-zA-Z0-9_-]+/g, "_");
+    XLSX.writeFile(wb, `historico_cliente_${safe}.xlsx`);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-lg font-semibold">{client.name}</div>
+          <div className="text-sm text-muted-foreground">{client.phone}</div>
+        </div>
+        <Button onClick={exportXlsx} className="bg-primary text-primary-foreground">
+          <Download className="w-4 h-4 mr-2" />
+          Exportar Excel
+        </Button>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="rounded-lg border border-border p-3 bg-muted/20">
+          <div className="text-xs text-muted-foreground">Total de corridas</div>
+          <div className="text-xl font-semibold">{rows.length}</div>
+        </div>
+        <div className="rounded-lg border border-border p-3 bg-muted/20">
+          <div className="text-xs text-muted-foreground">Corridas finalizadas</div>
+          <div className="text-xl font-semibold">{totalFinalizadas}</div>
+        </div>
+        <div className="rounded-lg border border-border p-3 bg-muted/20">
+          <div className="text-xs text-muted-foreground">Valor total</div>
+          <div className="text-xl font-semibold">
+            {(totalValorCentavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+          </div>
+        </div>
+      </div>
+      <div className="rounded-xl border border-border overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Data/Hora</TableHead>
+              <TableHead>Passageiro(s)</TableHead>
+              <TableHead>Origem → Destino</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Pagamento</TableHead>
+              <TableHead>Motorista</TableHead>
+              <TableHead className="text-right">Valor</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  Nenhuma corrida vinculada a este cliente/dependentes.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((s: any) => {
+                const passengers = splitPassengerNames(String(s.clientName || ""));
+                const hasDependent = passengers.some((n) => dependentNames.has(n.toLowerCase()));
+                const cents = Number(s.valorCobrado || 0) > 0 ? Number(s.valorCobrado || 0) : Math.round(Number(s.value || 0) * 100);
+                return (
+                  <TableRow key={s.id}>
+                    <TableCell>{format(new Date(s.dateTime), "dd/MM/yyyy HH:mm", { locale: ptBR })}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{passengers.join(", ") || s.clientName}</div>
+                      <div className="mt-1">
+                        <Badge variant="outline">{hasDependent ? "Inclui dependente" : "Titular"}</Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-[320px]">
+                      <div className="truncate" title={`${s.origin || "-"} → ${s.destination || "-"}`}>
+                        {s.origin || "-"} → {s.destination || "-"}
+                      </div>
+                    </TableCell>
+                    <TableCell>{statusLabel(String(s.status || ""))}</TableCell>
+                    <TableCell>{paymentLabel(String(s.formaPagamento || s.paymentMethod || ""))}</TableCell>
+                    <TableCell>{s.driver?.name || "Não atribuído"}</TableCell>
+                    <TableCell className="text-right">
+                      {(cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }
 

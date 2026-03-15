@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRoute } from "wouter";
 import { format } from "date-fns";
 import { api } from "@shared/routes";
-import vbmLogoUrl from "@assets/vbm-logo-1.png?url";
+import vbmLogoUrl from "@assets/vbm-logo-2.png?url";
 import privativoIconUrl from "@assets/privativo.png?url";
 import executivoIconUrl from "@assets/executivo.png?url";
 import paxIconUrl from "@assets/pax_icon.png?url";

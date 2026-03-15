@@ -140,6 +140,14 @@ export default function AgendaPage() {
     s === "finished" ? "Finalizado" :
     s === "canceled" ? "Cancelado" : s;
 
+  const driverActionStatus = (status: string, nextStatus: string | null) =>
+    status === "scheduled" && nextStatus === "driving_pickup" ? "Aguardando inicio da viagem." :
+    status === "driving_pickup" && nextStatus === "pickup_location" ? "Dirigindo até o local de embarque." :
+    status === "pickup_location" && nextStatus === "driving_destination" ? "Motorista chegou ao local de embarque." :
+    (status === "driving_destination" || status === "in_progress") && nextStatus === "finished" ? "Motorista chegou ao local de embarque." :
+    status === "finished" && !nextStatus ? "Motorista finalizou a viagem." :
+    "Aguardando atualização do status.";
+
   return (
     <Layout>
       <div className="mb-8">
@@ -357,7 +365,6 @@ export default function AgendaPage() {
                         const ok = window.confirm(`Deseja avançar o status para "${statusLabel(nextStatus)}"?`);
                         if (!ok) return;
                         await updateMutation.mutateAsync({ id: serviceId, status: nextStatus as any });
-                        setOpenServiceId(null);
                       }}
                       className="bg-[#d4af37] text-black hover:bg-[#c39a2f]"
                       style={{ width: "100%" }}
@@ -396,6 +403,9 @@ export default function AgendaPage() {
                     >
                       Concluir viagem
                     </Button>
+                  </div>
+                  <div className="mt-2 text-sm text-white/80">
+                    Status: {driverActionStatus(String(s.status), nextStatus)}
                   </div>
                 </div>
                 <div className="mt-4">

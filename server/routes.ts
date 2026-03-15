@@ -972,6 +972,26 @@ export async function registerRoutes(
         }
       }
       const service = await storage.createService(normalized as typeof input);
+      try {
+        const methodNow = service.formaPagamento || service.paymentMethod;
+        const statusPayNow = service.statusPagamento || normalized.statusPagamento;
+        const usesSaldo = methodNow === "saldo" || statusPayNow === "saldo";
+        const finished = service.status === "finished";
+        if (finished && usesSaldo && service.clientId != null) {
+          const amountCents =
+            Number(service.valorCobrado || 0) > 0
+              ? Number(service.valorCobrado || 0)
+              : Math.round(Number(service.value || 0) * 100);
+          if (amountCents > 0) {
+            await db
+              .update(clients)
+              .set({ balanceCentavos: sql`${clients.balanceCentavos} - ${amountCents}` })
+              .where(eq(clients.id, service.clientId as number));
+          }
+        }
+      } catch (e) {
+        console.error("[services.create] erro ao debitar saldo:", e);
+      }
       res.status(201).json(service);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1021,10 +1041,14 @@ export async function registerRoutes(
       try {
         const methodPrev = (prevService as any)?.formaPagamento || (prevService as any)?.paymentMethod;
         const methodNow = service.formaPagamento || service.paymentMethod;
+        const statusPayPrev = (prevService as any)?.statusPagamento;
+        const statusPayNow = (service as any)?.statusPagamento;
+        const wasSaldo = methodPrev === "saldo" || statusPayPrev === "saldo";
+        const isSaldo = methodNow === "saldo" || statusPayNow === "saldo";
         const isFinishedNow = service.status === "finished" && prevService?.status !== "finished";
-        const becameSaldo = methodNow === "saldo" && methodPrev !== "saldo";
+        const becameSaldo = isSaldo && !wasSaldo;
         const finished = service.status === "finished";
-        const shouldChargeSaldo = ((isFinishedNow && methodNow === "saldo") || (finished && becameSaldo)) && service.clientId != null;
+        const shouldChargeSaldo = ((isFinishedNow && isSaldo) || (finished && becameSaldo)) && service.clientId != null;
         if (shouldChargeSaldo) {
           const amountCents =
             Number(service.valorCobrado || 0) > 0
@@ -1038,8 +1062,6 @@ export async function registerRoutes(
           }
         }
         // Ajuste de saldo quando já era SALDO e valor foi alterado
-        const wasSaldo = methodPrev === "saldo";
-        const isSaldo = methodNow === "saldo";
         if (finished && wasSaldo && isSaldo && service.clientId != null) {
           const prevAmount =
             Number((prevService as any)?.valorCobrado || 0) > 0

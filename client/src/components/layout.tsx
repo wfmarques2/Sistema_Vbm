@@ -18,12 +18,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
 import { Switch } from "@/components/ui/switch";
 import { Sun, Moon } from "lucide-react";
+import vbmLogoDarkUrl from "@assets/vbm-logo-1.png?url";
+import vbmLogoLightUrl from "@assets/vbm-logo-2.png?url";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(location.startsWith("/finance/"));
   const [servicesOpen, setServicesOpen] = useState(
     location === "/services" ||
@@ -51,6 +54,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { name: "Painel Financeiro", href: "/finance/dashboard", icon: LayoutDashboard },
   ];
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const currentTheme = mounted ? (resolvedTheme || theme || "light") : "light";
+  const logoUrl = currentTheme === "dark" ? vbmLogoDarkUrl : vbmLogoLightUrl;
+
   // Mantém estado sem animar na navegação inicial, evitando "abre-fecha" rápido
 
   return (
@@ -72,7 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="h-full flex flex-col">
           <div className="p-6 border-b border-border/50 flex flex-col items-center">
             <img
-              src="/logo-vbm.png"
+              src={logoUrl}
               alt="VBM Transfer Executivo"
               className="w-32 h-32 object-contain"
             />

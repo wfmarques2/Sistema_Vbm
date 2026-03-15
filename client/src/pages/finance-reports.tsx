@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useVehicles } from "@/hooks/use-vehicles";
 import { useDrivers } from "@/hooks/use-drivers";
 import { saveAs } from "file-saver";
+import vbmLogoLightUrl from "@assets/vbm-logo-2.png?url";
 
 export default function FinanceReportsPage() {
   const [start, setStart] = useState<string>("");
@@ -79,7 +80,7 @@ export default function FinanceReportsPage() {
     const col = (r: number, g: number, b: number) => pdf.setTextColor(r, g, b);
     const fill = (r: number, g: number, b: number) => pdf.setFillColor(r, g, b);
     const line = (r: number, g: number, b: number) => pdf.setDrawColor(r, g, b);
-    const logoUrl = "/logo-vbm.png";
+    const logoUrl = vbmLogoLightUrl;
     const logoDataUrl = await loadImageDataUrl(logoUrl);
     async function drawPageHeader() {
       fill(255, 255, 255);

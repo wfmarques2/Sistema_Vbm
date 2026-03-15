@@ -5,10 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FormEvent, useCallback, useMemo } from "react";
+import { FormEvent, useCallback, useEffect, useMemo } from "react";
+import { useTheme } from "next-themes";
+import vbmLogoDarkUrl from "@assets/vbm-logo-1.png?url";
+import vbmLogoLightUrl from "@assets/vbm-logo-2.png?url";
 
 export default function LoginPage() {
   const { toast } = useToast();
+  const { theme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,6 +23,11 @@ export default function LoginPage() {
   const [newPass, setNewPass] = useState("");
   const [newPass2, setNewPass2] = useState("");
   const canSubmitReset = useMemo(() => newPass.length >= 6 && newPass === newPass2, [newPass, newPass2]);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const currentTheme = mounted ? (resolvedTheme || theme || "light") : "light";
+  const logoUrl = currentTheme === "dark" ? vbmLogoDarkUrl : vbmLogoLightUrl;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,7 +121,7 @@ export default function LoginPage() {
         <div className="relative z-20 max-w-lg">
           <div className="bg-black/25 backdrop-blur-sm rounded-xl p-6 text-center text-primary-foreground shadow-lg ring-1 ring-black/10">
             <div className="flex flex-col items-center gap-6 mb-6">
-              <img src="/logo-vbm.png" alt="VBM Transfer Executivo" className="w-96 h-96 object-contain" />
+              <img src={logoUrl} alt="VBM Transfer Executivo" className="w-96 h-96 object-contain" />
               <h1 className="text-4xl font-display font-bold tracking-wide drop-shadow-lg">VBM Transfer Executivo</h1>
             </div>
             <h2 className="text-5xl font-display font-bold leading-tight mb-4 drop-shadow-lg">
@@ -129,7 +139,7 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center lg:text-left">
-            <img src="/logo-vbm.png" alt="VBM Transfer Executivo" className="lg:hidden mx-auto mb-4 w-24 h-24 object-contain" />
+            <img src={logoUrl} alt="VBM Transfer Executivo" className="lg:hidden mx-auto mb-4 w-24 h-24 object-contain" />
             <h2 className="text-3xl font-bold font-display text-primary">Bem-vindo</h2>
             <p className="text-muted-foreground mt-2">Faça login para acessar seu painel.</p>
           </div>
