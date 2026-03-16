@@ -68,6 +68,11 @@ export default function ServiceEditPage() {
     kmPrevisto: z.union([z.string(), z.number()]).optional(),
     guide: z.string().nullable().optional(),
     returnDateTime: z.union([z.date(), z.string()]).optional(),
+    paxAdt: z.union([z.string(), z.number()]).optional(),
+    paxChd: z.union([z.string(), z.number()]).optional(),
+    paxInf: z.union([z.string(), z.number()]).optional(),
+    paxSen: z.union([z.string(), z.number()]).optional(),
+    paxFree: z.union([z.string(), z.number()]).optional(),
   });
 
   const form = useForm<z.infer<typeof serviceFormSchema>>({
@@ -92,6 +97,11 @@ export default function ServiceEditPage() {
       flight: "",
       passengers: 0,
       bags: 0,
+      paxAdt: "",
+      paxChd: "",
+      paxInf: "",
+      paxSen: "",
+      paxFree: "",
     },
   });
 
@@ -265,6 +275,11 @@ export default function ServiceEditPage() {
       flight: values.flight ? String(values.flight).trim() : undefined,
       passengers: passengersFinal || undefined,
       bags: Number(values.bags ?? 0) || undefined,
+      paxAdt: Number(values.paxAdt ?? 0) || undefined,
+      paxChd: Number(values.paxChd ?? 0) || undefined,
+      paxInf: Number(values.paxInf ?? 0) || undefined,
+      paxSen: Number(values.paxSen ?? 0) || undefined,
+      paxFree: Number(values.paxFree ?? 0) || undefined,
       valorPagoParcial: (() => {
         const display = String(valorParcialDisplay || "").replace(/\D/g, "");
         return display ? parseInt(display, 10) : undefined;
@@ -540,6 +555,78 @@ export default function ServiceEditPage() {
                   </FormItem>
                 );
               }} />
+            </div>
+            <div className="grid grid-cols-5 gap-4">
+              <FormField control={form.control} name="paxAdt" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>ADT</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={String(field.value ?? "")}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="paxChd" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>CHD</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={String(field.value ?? "")}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="paxInf" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>INF</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={String(field.value ?? "")}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="paxSen" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>SEN</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={String(field.value ?? "")}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="paxFree" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>FREE</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={String(field.value ?? "")}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="origin" render={({ field }) => (
