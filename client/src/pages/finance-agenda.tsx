@@ -3,10 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Trash2 } from "lucide-react";
+import { Trash2, Filter } from "lucide-react";
 import { useState, useMemo } from "react";
 import { addMonths, format, startOfMonth, endOfMonth, addDays, subDays } from "date-fns";
 import { useCreateCompanyExpense, useListUnifiedExpenses, useDeleteUnifiedExpense, useListCompanyExpenses, useListVehicleExpenses } from "@/hooks/use-financial";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateQuickFilters } from "@/components/date-quick-filters";
 
 export default function FinanceAgendaPage() {
   const today = new Date();
@@ -14,6 +16,28 @@ export default function FinanceAgendaPage() {
   const defaultEnd = endOfMonth(today).toISOString().slice(0, 10);
   const [start, setStart] = useState<string>(defaultStart);
   const [end, setEnd] = useState<string>(defaultEnd);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterMonth, setFilterMonth] = useState<string>(String(today.getMonth()));
+  const monthOptions = [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+  ];
+  const toDateInput = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
 
   const { data: unified, isLoading: loadingUnified, refetch } = useListUnifiedExpenses({ start, end, sortOrder: "asc", limit: 500 });
   const { data: company } = useListCompanyExpenses({ start, end, active: true, sortBy: "ocorridaEm", sortOrder: "asc" });
@@ -50,13 +74,54 @@ export default function FinanceAgendaPage() {
           <h2 className="text-3xl font-display font-bold text-primary">Agenda Financeira</h2>
           <p className="text-muted-foreground">Exibe despesas pelo período selecionado.</p>
         </div>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <div className="min-w-44">
+            <Select
+              value={filterMonth}
+              onValueChange={(v) => {
+                setFilterMonth(v);
+                if (v === "all") {
+                  return;
+                }
+                const year = new Date().getFullYear();
+                const month = Number(v);
+                const monthStart = new Date(year, month, 1);
+                const monthEnd = new Date(year, month + 1, 0);
+                setStart(toDateInput(monthStart));
+                setEnd(toDateInput(monthEnd));
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Mês" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os meses</SelectItem>
+                {monthOptions.map((m, idx) => (
+                  <SelectItem key={m} value={String(idx)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="outline" className="gap-2" onClick={() => setShowFilters((s) => !s)}>
+            <Filter className="w-4 h-4" />
+            {showFilters ? "Ocultar filtros" : "Filtros"}
+          </Button>
+        </div>
       </div>
 
+      {showFilters && (
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Período</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          <DateQuickFilters
+            start={start}
+            end={end}
+            onChange={({ start: s, end: e }) => {
+              setStart(s);
+              setEnd(e);
+              setFilterMonth("all");
+            }}
+          />
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => { const d = new Date(); const s = d.toISOString().slice(0,10); setStart(s); setEnd(s); }}>
               Hoje
@@ -83,6 +148,7 @@ export default function FinanceAgendaPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       <Card>
         <CardHeader>

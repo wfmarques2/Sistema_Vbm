@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { addMonths } from "date-fns";
 import { useListUnifiedExpenses, useCreateUnifiedExpense, useDeleteUnifiedExpense, useUpdateCompanyExpense, useUpdateVehicleExpense } from "@/hooks/use-financial";
-import { Trash2 } from "lucide-react";
+import { Trash2, Filter } from "lucide-react";
 import { useDrivers } from "@/hooks/use-drivers";
 import { useVehicles } from "@/hooks/use-vehicles";
 import { Button } from "@/components/ui/button";
@@ -216,6 +216,8 @@ function VehicleExpenseRow({
 function UnifiedExpensesTab() {
   const [uStart, setUStart] = useState<string>("");
   const [uEnd, setUEnd] = useState<string>("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterMonth, setFilterMonth] = useState<string>("all");
   const [uTipo, setUTipo] = useState<"vehicle"|"company"|"driver_payment"|"">("");
   const [uCategoria, setUCategoria] = useState<string>("");
   const [uVehicleId, setUVehicleId] = useState<number| "">("");
@@ -225,6 +227,26 @@ function UnifiedExpensesTab() {
   const [uLimit, setULimit] = useState<number>(50);
   const [uOffset, setUOffset] = useState<number>(0);
   const [uSortOrder, setUSortOrder] = useState<"asc"|"desc">("desc");
+  const monthOptions = [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+  ];
+  const toDateInput = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
   const { data: unifiedRows, isLoading: isLoadingUnified, isError: isErrorUnified, refetch: refetchUnified } = useListUnifiedExpenses({
     start: uStart || undefined,
     end: uEnd || undefined,
@@ -240,52 +262,89 @@ function UnifiedExpensesTab() {
   });
   return (
     <>
-      <DateQuickFilters
-        start={uStart}
-        end={uEnd}
-        onChange={({ start, end }) => { setUStart(start); setUEnd(end); }}
-        className="mb-4"
-      />
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
-        <Select value={uTipo} onValueChange={(v) => setUTipo(v as any)}>
-          <SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="vehicle">Veículo</SelectItem>
-            <SelectItem value="company">Empresa</SelectItem>
-            <SelectItem value="driver_payment">Pagamento Motorista</SelectItem>
-            <SelectItem value="service">Serviço (custos)</SelectItem>
-          </SelectContent>
-        </Select>
-        <Input value={uCategoria} onChange={(e) => setUCategoria(e.target.value)} placeholder="Categoria" />
-        <Input type="number" value={uVehicleId} onChange={(e) => setUVehicleId(Number(e.target.value) || "")} placeholder="Vehicle ID" />
-        <Input type="number" value={uDriverId} onChange={(e) => setUDriverId(Number(e.target.value) || "")} placeholder="Driver ID" />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-        <Input type="number" value={uServiceId} onChange={(e) => setUServiceId(Number(e.target.value) || "")} placeholder="Service ID" />
-        <Select value={uStatus} onValueChange={setUStatus}>
-          <SelectTrigger><SelectValue placeholder="Status Pagamento" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="pending">Pendente</SelectItem>
-            <SelectItem value="paid">Pago</SelectItem>
-            <SelectItem value="partial">Parcial</SelectItem>
-            <SelectItem value="overdue">Atrasado</SelectItem>
-            <SelectItem value="canceled">Cancelado</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={uSortOrder} onValueChange={(v) => setUSortOrder(v as any)}>
-          <SelectTrigger><SelectValue placeholder="Ordem" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="desc">Desc</SelectItem>
-            <SelectItem value="asc">Asc</SelectItem>
-          </SelectContent>
-        </Select>
-        <Input type="number" value={uLimit} onChange={(e) => setULimit(Number(e.target.value) || 50)} placeholder="Limite" />
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setUOffset(Math.max(0, uOffset - uLimit))}>Anterior</Button>
-          <Button variant="outline" onClick={() => setUOffset(uOffset + uLimit)}>Próximo</Button>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="min-w-44">
+          <Select
+            value={filterMonth}
+            onValueChange={(v) => {
+              setFilterMonth(v);
+              if (v === "all") {
+                setUStart("");
+                setUEnd("");
+                return;
+              }
+              const year = new Date().getFullYear();
+              const month = Number(v);
+              const monthStart = new Date(year, month, 1);
+              const monthEnd = new Date(year, month + 1, 0);
+              setUStart(toDateInput(monthStart));
+              setUEnd(toDateInput(monthEnd));
+            }}
+          >
+            <SelectTrigger><SelectValue placeholder="Mês" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os meses</SelectItem>
+              {monthOptions.map((m, idx) => (
+                <SelectItem key={m} value={String(idx)}>{m}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+        <Button variant="outline" className="gap-2" onClick={() => setShowFilters((s) => !s)}>
+          <Filter className="w-4 h-4" />
+          {showFilters ? "Ocultar filtros" : "Filtros"}
+        </Button>
       </div>
-      <Button onClick={() => refetchUnified()} disabled={isLoadingUnified}>Filtrar</Button>
+      {showFilters && (
+      <div className="rounded-lg border border-border bg-muted/20 p-3 mb-4">
+        <DateQuickFilters
+          start={uStart}
+          end={uEnd}
+          onChange={({ start, end }) => { setUStart(start); setUEnd(end); setFilterMonth("all"); }}
+          className="mb-4"
+        />
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
+          <Select value={uTipo} onValueChange={(v) => setUTipo(v as any)}>
+            <SelectTrigger><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="vehicle">Veículo</SelectItem>
+              <SelectItem value="company">Empresa</SelectItem>
+              <SelectItem value="driver_payment">Pagamento Motorista</SelectItem>
+              <SelectItem value="service">Serviço (custos)</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input value={uCategoria} onChange={(e) => setUCategoria(e.target.value)} placeholder="Categoria" />
+          <Input type="number" value={uVehicleId} onChange={(e) => setUVehicleId(Number(e.target.value) || "")} placeholder="Vehicle ID" />
+          <Input type="number" value={uDriverId} onChange={(e) => setUDriverId(Number(e.target.value) || "")} placeholder="Driver ID" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
+          <Input type="number" value={uServiceId} onChange={(e) => setUServiceId(Number(e.target.value) || "")} placeholder="Service ID" />
+          <Select value={uStatus} onValueChange={setUStatus}>
+            <SelectTrigger><SelectValue placeholder="Status Pagamento" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pendente</SelectItem>
+              <SelectItem value="paid">Pago</SelectItem>
+              <SelectItem value="partial">Parcial</SelectItem>
+              <SelectItem value="overdue">Atrasado</SelectItem>
+              <SelectItem value="canceled">Cancelado</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={uSortOrder} onValueChange={(v) => setUSortOrder(v as any)}>
+            <SelectTrigger><SelectValue placeholder="Ordem" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desc">Desc</SelectItem>
+              <SelectItem value="asc">Asc</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input type="number" value={uLimit} onChange={(e) => setULimit(Number(e.target.value) || 50)} placeholder="Limite" />
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setUOffset(Math.max(0, uOffset - uLimit))}>Anterior</Button>
+            <Button variant="outline" onClick={() => setUOffset(uOffset + uLimit)}>Próximo</Button>
+          </div>
+        </div>
+        <Button onClick={() => refetchUnified()} disabled={isLoadingUnified}>Filtrar</Button>
+      </div>
+      )}
       {isLoadingUnified && <div className="text-muted-foreground mt-4">Carregando...</div>}
       {isErrorUnified && <div className="text-destructive mt-4">Erro ao carregar despesas unificadas.</div>}
       {unifiedRows && (

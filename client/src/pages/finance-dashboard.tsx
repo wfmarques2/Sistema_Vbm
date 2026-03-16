@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFinanceDashboard } from "@/hooks/use-finance-dashboard";
 import { useServices } from "@/hooks/use-services";
-import { Download } from "lucide-react";
+import { Download, Filter } from "lucide-react";
 import { useState } from "react";
 import { DateQuickFilters } from "@/components/date-quick-filters";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,6 +32,28 @@ export default function FinanceDashboardPage() {
   const [end, setEnd] = useState<string>(new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10));
   const [vehicleId, setVehicleId] = useState<number | "">("");
   const [driverId, setDriverId] = useState<number | "">("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterMonth, setFilterMonth] = useState<string>(String(now.getMonth()));
+  const monthOptions = [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+  ];
+  const toDateInput = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
   const { data: vehicles } = useVehicles();
   const { data: drivers } = useDrivers();
   const { data, isLoading, isError } = useFinanceDashboard({
@@ -253,27 +275,61 @@ export default function FinanceDashboardPage() {
           <h2 className="text-3xl font-display font-bold text-primary">Dashboard Financeiro</h2>
           <p className="text-muted-foreground">Métricas de receita, lucro e custos otimizadas para decisão.</p>
         </div>
-        <a
-          href={(() => {
-            const url = new URL("/api/financial/dashboard.csv", window.location.origin);
-            if (start) url.searchParams.set("start", start);
-            if (end) url.searchParams.set("end", end);
-            if (typeof vehicleId === "number") url.searchParams.set("vehicleId", String(vehicleId));
-            if (typeof driverId === "number") url.searchParams.set("driverId", String(driverId));
-            return url.pathname + url.search;
-          })()}
-          className="inline-flex"
-        >
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Exportar CSV
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <div className="min-w-44">
+            <Select
+              value={filterMonth}
+              onValueChange={(v) => {
+                setFilterMonth(v);
+                if (v === "all") {
+                  setStart("");
+                  setEnd("");
+                  return;
+                }
+                const year = new Date().getFullYear();
+                const month = Number(v);
+                const monthStart = new Date(year, month, 1);
+                const monthEnd = new Date(year, month + 1, 0);
+                setStart(toDateInput(monthStart));
+                setEnd(toDateInput(monthEnd));
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Mês" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os meses</SelectItem>
+                {monthOptions.map((m, idx) => (
+                  <SelectItem key={m} value={String(idx)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="outline" className="gap-2" onClick={() => setShowFilters((s) => !s)}>
+            <Filter className="w-4 h-4" />
+            {showFilters ? "Ocultar filtros" : "Filtros"}
           </Button>
-        </a>
-        <Button variant="secondary" onClick={exportExcel} className="ml-2">
-          Exportar Excel
-        </Button>
+          <a
+            href={(() => {
+              const url = new URL("/api/financial/dashboard.csv", window.location.origin);
+              if (start) url.searchParams.set("start", start);
+              if (end) url.searchParams.set("end", end);
+              if (typeof vehicleId === "number") url.searchParams.set("vehicleId", String(vehicleId));
+              if (typeof driverId === "number") url.searchParams.set("driverId", String(driverId));
+              return url.pathname + url.search;
+            })()}
+            className="inline-flex"
+          >
+            <Button variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
+          </a>
+          <Button variant="secondary" onClick={exportExcel}>
+            Exportar Excel
+          </Button>
+        </div>
       </div>
 
+      {showFilters && (
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
@@ -285,6 +341,7 @@ export default function FinanceDashboardPage() {
             onChange={({ start: s, end: e }) => {
               setStart(s);
               setEnd(e);
+              setFilterMonth("all");
             }}
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -309,6 +366,7 @@ export default function FinanceDashboardPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {isLoading && <div className="text-muted-foreground">Carregando...</div>}
       {isError && <div className="text-destructive">Erro ao carregar dados.</div>}

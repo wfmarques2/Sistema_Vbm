@@ -10,6 +10,7 @@ import { useClients } from "@/hooks/use-clients";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError, redirectToLogin } from "@/lib/auth-utils";
 import { DateQuickFilters } from "@/components/date-quick-filters";
+import { Filter } from "lucide-react";
 
 export default function FinanceRevenuesPage() {
   const [start, setStart] = useState<string>("");
@@ -27,6 +28,28 @@ export default function FinanceRevenuesPage() {
   const [clientId, setClientId] = useState<number | "">("");
   const [metodo, setMetodo] = useState<string>("pix");
   const [dataRecebida, setDataRecebida] = useState<string>("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterMonth, setFilterMonth] = useState<string>("all");
+  const monthOptions = [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+  ];
+  const toDateInput = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
 
   const total = (revenues || []).reduce((acc, r) => acc + Number(r.valorCentavos || 0), 0);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -145,20 +168,58 @@ export default function FinanceRevenuesPage() {
           <CardTitle>Receitas no Período</CardTitle>
         </CardHeader>
         <CardContent>
-          <DateQuickFilters
-            start={start}
-            end={end}
-            onChange={({ start: s, end: e }) => { setStart(s); setEnd(e); }}
-            className="mb-4"
-          />
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-2">
-            <div className="md:col-span-2 md:col-start-3 text-right">
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <div className="min-w-44">
+              <Select
+                value={filterMonth}
+                onValueChange={(v) => {
+                  setFilterMonth(v);
+                  if (v === "all") {
+                    setStart("");
+                    setEnd("");
+                    return;
+                  }
+                  const year = new Date().getFullYear();
+                  const month = Number(v);
+                  const monthStart = new Date(year, month, 1);
+                  const monthEnd = new Date(year, month + 1, 0);
+                  setStart(toDateInput(monthStart));
+                  setEnd(toDateInput(monthEnd));
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Mês" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os meses</SelectItem>
+                  {monthOptions.map((m, idx) => (
+                    <SelectItem key={m} value={String(idx)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" className="gap-2" onClick={() => setShowFilters((s) => !s)}>
+              <Filter className="w-4 h-4" />
+              {showFilters ? "Ocultar filtros" : "Filtros"}
+            </Button>
+            <div className="ml-auto text-right">
               <span className="text-sm text-muted-foreground">Total:</span>{" "}
               <span className="text-lg font-semibold">
                 {(total / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </span>
             </div>
           </div>
+          {showFilters && (
+            <div className="rounded-lg border border-border bg-muted/20 p-3 mb-4">
+              <DateQuickFilters
+                start={start}
+                end={end}
+                onChange={({ start: s, end: e }) => {
+                  setStart(s);
+                  setEnd(e);
+                  setFilterMonth("all");
+                }}
+              />
+            </div>
+          )}
           <Table>
             <TableHeader>
               <TableRow>

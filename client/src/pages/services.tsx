@@ -63,6 +63,8 @@ export default function ServicesPage() {
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>("all");
   const [filterDriverId, setFilterDriverId] = useState<number | "">("");
   const [filterVehicleId, setFilterVehicleId] = useState<number | "">("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterMonth, setFilterMonth] = useState<string>("all");
   const pageSize = 20;
   const [page, setPage] = useState(0);
   const enabled = true;
@@ -104,6 +106,26 @@ export default function ServicesPage() {
   const qc = useQueryClient();
   const createDriverPay = useCreateDriverPayment();
   const [editingService, setEditingService] = useState<any | null>(null);
+  const monthOptions = [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+  ];
+  const toDateInput = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
 
   const serviceFormSchema = insertServiceSchema.extend({
     driverId: z.union([z.string(), z.number()]).nullable().optional(),
@@ -751,35 +773,40 @@ export default function ServicesPage() {
             />
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="min-w-48">
-              <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
+            <div className="min-w-40">
+              <Select
+                value={filterMonth}
+                onValueChange={(v) => {
+                  setFilterMonth(v);
+                  if (v === "all") {
+                    setStart("");
+                    setEnd("");
+                    setPage(0);
+                    return;
+                  }
+                  const year = new Date().getFullYear();
+                  const month = Number(v);
+                  const monthStart = new Date(year, month, 1);
+                  const monthEnd = new Date(year, month + 1, 0);
+                  setStart(toDateInput(monthStart));
+                  setEnd(toDateInput(monthEnd));
+                  setPage(0);
+                }}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Pagamento (status)" />
+                  <SelectValue placeholder="Mês" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                        {["pending","paid","saldo","partial","overdue","canceled","pay_driver"].map(s => (
-                    <SelectItem key={s} value={s}>{paymentStatusLabel(s)}</SelectItem>
+                  <SelectItem value="all">Todos os meses</SelectItem>
+                  {monthOptions.map((m, idx) => (
+                    <SelectItem key={m} value={String(idx)}>{m}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="min-w-48">
-              <Select value={filterTravelStatus} onValueChange={setFilterTravelStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Status da viagem" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {serviceStatusEnum.map(s => (
-                    <SelectItem key={s} value={s}>{statusLabel(s)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button variant="outline" className="gap-2" onClick={() => {}}>
+            <Button variant="outline" className="gap-2" onClick={() => setShowFilters((v) => !v)}>
               <Filter className="w-4 h-4" />
-              Filtros
+              {showFilters ? "Ocultar filtros" : "Filtros"}
             </Button>
             <Button variant="outline" className="gap-2" onClick={exportServicesXlsx}>
               <Download className="w-4 h-4" />
@@ -787,12 +814,18 @@ export default function ServicesPage() {
             </Button>
           </div>
         </div>
-        <div className="mb-4">
-          <div className="space-y-3">
+        {showFilters && (
+        <div className="mb-4 p-4 border-b border-border/60">
+          <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
             <DateQuickFilters
               start={start}
               end={end}
-              onChange={({ start: s, end: e }) => { setStart(s); setEnd(e); setPage(0); }}
+              onChange={({ start: s, end: e }) => {
+                setStart(s);
+                setEnd(e);
+                setFilterMonth("all");
+                setPage(0);
+              }}
             />
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <Select value={String(filterDriverId)} onValueChange={(v) => { setFilterDriverId(v === "none" ? "" : Number(v)); setPage(0); }}>
@@ -850,6 +883,7 @@ export default function ServicesPage() {
             </div>
           </div>
         </div>
+        )}
 
         <div className="w-full overflow-x-auto hidden md:block">
         <Table className="min-w-[1100px]">

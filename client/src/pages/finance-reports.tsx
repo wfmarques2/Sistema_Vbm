@@ -12,12 +12,35 @@ import { useVehicles } from "@/hooks/use-vehicles";
 import { useDrivers } from "@/hooks/use-drivers";
 import { saveAs } from "file-saver";
 import vbmLogoLightUrl from "@assets/vbm-logo-2.png?url";
+import { Filter } from "lucide-react";
 
 export default function FinanceReportsPage() {
   const [start, setStart] = useState<string>("");
   const [end, setEnd] = useState<string>("");
   const [vehicleId, setVehicleId] = useState<number | "">("");
   const [driverId, setDriverId] = useState<number | "">("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterMonth, setFilterMonth] = useState<string>("all");
+  const monthOptions = [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+  ];
+  const toDateInput = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
   const { data: vehicles } = useVehicles();
   const { data: drivers } = useDrivers();
 
@@ -346,13 +369,45 @@ export default function FinanceReportsPage() {
           <h2 className="text-3xl font-display font-bold text-primary">Relatórios Financeiros</h2>
           <p className="text-muted-foreground">Resumo por período com custo médio por km.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <div className="min-w-44">
+            <Select
+              value={filterMonth}
+              onValueChange={(v) => {
+                setFilterMonth(v);
+                if (v === "all") {
+                  setStart("");
+                  setEnd("");
+                  return;
+                }
+                const year = new Date().getFullYear();
+                const month = Number(v);
+                const monthStart = new Date(year, month, 1);
+                const monthEnd = new Date(year, month + 1, 0);
+                setStart(toDateInput(monthStart));
+                setEnd(toDateInput(monthEnd));
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Mês" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os meses</SelectItem>
+                {monthOptions.map((m, idx) => (
+                  <SelectItem key={m} value={String(idx)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="outline" className="gap-2" onClick={() => setShowFilters((s) => !s)}>
+            <Filter className="w-4 h-4" />
+            {showFilters ? "Ocultar filtros" : "Filtros"}
+          </Button>
           <Button variant="secondary" onClick={exportPdf} disabled={!enabled || isLoading}>Exportar PDF</Button>
           <Button variant="secondary" onClick={exportExcel} disabled={!enabled || isLoading}>Exportar Excel</Button>
         </div>
       </div>
 
       <div className="finance-report-area">
+      {showFilters && (
       <Card>
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
@@ -361,7 +416,7 @@ export default function FinanceReportsPage() {
           <DateQuickFilters
             start={start}
             end={end}
-            onChange={({ start: s, end: e }) => { setStart(s); setEnd(e); }}
+            onChange={({ start: s, end: e }) => { setStart(s); setEnd(e); setFilterMonth("all"); }}
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Select value={String(vehicleId)} onValueChange={(v) => setVehicleId(v === "none" ? "" : Number(v))}>
@@ -388,8 +443,9 @@ export default function FinanceReportsPage() {
           </Button>
         </CardContent>
       </Card>
+      )}
 
-      <Card className="mt-6">
+      <Card className={showFilters ? "mt-6" : ""}>
         <CardHeader>
           <CardTitle>Resultado</CardTitle>
         </CardHeader>
