@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useFinanceDashboard } from "@/hooks/use-finance-dashboard";
 import { useServices } from "@/hooks/use-services";
 import { Download, Filter } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DateQuickFilters } from "@/components/date-quick-filters";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVehicles } from "@/hooks/use-vehicles";
@@ -83,6 +83,55 @@ export default function FinanceDashboardPage() {
     return dt.toISOString().slice(0, 10);
   }
 
+  const directServiceCostCents = (s: any) =>
+    Number(s.combustivel || 0) +
+    Number(s.pedagio || 0) +
+    Number(s.estacionamento || 0) +
+    Number(s.alimentacao || 0) +
+    Number(s.outrosCustos || 0);
+  const directServiceRevenueCents = (s: any) => {
+    const charged = Number(s.valorCobrado || 0);
+    if (charged > 0) return charged;
+    const parsed = Math.round(Number(s.value || 0) * 100);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const billingServices = useMemo(() => {
+    const rows = monthServices || [];
+    const parents = rows.filter((s: any) => !s.isReturn);
+    const groupedReturns = new Map<number, any[]>();
+    rows
+      .filter((s: any) => s.isReturn && s.parentServiceId)
+      .forEach((s: any) => {
+        const key = Number(s.parentServiceId);
+        const arr = groupedReturns.get(key) || [];
+        arr.push(s);
+        groupedReturns.set(key, arr);
+      });
+    const consolidated = parents.map((p: any) => {
+      const returns = groupedReturns.get(Number(p.id)) || [];
+      const ownCost = directServiceCostCents(p);
+      const returnCost = returns.reduce((sum, r) => sum + directServiceCostCents(r), 0);
+      return {
+        ...p,
+        receitaConsolidadaCentavos: directServiceRevenueCents(p),
+        custosConsolidadosCentavos: ownCost + returnCost,
+      };
+    });
+    const orphanReturns = rows.filter(
+      (s: any) =>
+        s.isReturn &&
+        (!s.parentServiceId || !parents.some((p: any) => Number(p.id) === Number(s.parentServiceId)))
+    );
+    for (const r of orphanReturns) {
+      consolidated.push({
+        ...r,
+        receitaConsolidadaCentavos: 0,
+        custosConsolidadosCentavos: directServiceCostCents(r),
+      });
+    }
+    return consolidated;
+  }, [monthServices]);
+
   const seriesData = (() => {
     const days: Record<string, { date: string; receita: number; custos: number; lucro: number }> = {};
     (monthServices || []).forEach((s: any) => {
@@ -121,33 +170,28 @@ export default function FinanceDashboardPage() {
 
   const paymentMethodTotals = (() => {
     const acc: Record<string, number> = {};
-    (monthServices || []).forEach((s: any) => {
+    billingServices.forEach((s: any) => {
       const m = s.formaPagamento || s.paymentMethod || "-";
-      acc[m] = (acc[m] || 0) + Number(s.valorCobrado || 0);
+      acc[m] = (acc[m] || 0) + Number(s.receitaConsolidadaCentavos || 0);
     });
     return acc;
   })();
 
   const paymentStatusTotals = (() => {
     const acc: Record<string, number> = {};
-    (monthServices || []).forEach((s: any) => {
+    billingServices.forEach((s: any) => {
       const st = s.statusPagamento || "pending";
-      acc[st] = (acc[st] || 0) + Number(s.valorCobrado || 0);
+      acc[st] = (acc[st] || 0) + Number(s.receitaConsolidadaCentavos || 0);
     });
     return acc;
   })();
 
   const topClients = (() => {
     const acc: Record<string, { receita: number; lucro: number }> = {};
-    (monthServices || []).forEach((s: any) => {
+    billingServices.forEach((s: any) => {
       const name = String(s.clientName || "-");
-      const receita = Number(s.valorCobrado || 0);
-      const custos =
-        Number(s.combustivel || 0) +
-        Number(s.pedagio || 0) +
-        Number(s.estacionamento || 0) +
-        Number(s.alimentacao || 0) +
-        Number(s.outrosCustos || 0);
+      const receita = Number(s.receitaConsolidadaCentavos || 0);
+      const custos = Number(s.custosConsolidadosCentavos || 0);
       acc[name] = acc[name] || { receita: 0, lucro: 0 };
       acc[name].receita += receita;
       acc[name].lucro += receita - custos;
@@ -159,15 +203,10 @@ export default function FinanceDashboardPage() {
 
   const topDrivers = (() => {
     const acc: Record<string, { receita: number; lucro: number }> = {};
-    (monthServices || []).forEach((s: any) => {
+    billingServices.forEach((s: any) => {
       const name = String(s.driver?.name || "-");
-      const receita = Number(s.valorCobrado || 0);
-      const custos =
-        Number(s.combustivel || 0) +
-        Number(s.pedagio || 0) +
-        Number(s.estacionamento || 0) +
-        Number(s.alimentacao || 0) +
-        Number(s.outrosCustos || 0);
+      const receita = Number(s.receitaConsolidadaCentavos || 0);
+      const custos = Number(s.custosConsolidadosCentavos || 0);
       acc[name] = acc[name] || { receita: 0, lucro: 0 };
       acc[name].receita += receita;
       acc[name].lucro += receita - custos;
@@ -179,15 +218,10 @@ export default function FinanceDashboardPage() {
 
   const topVehicles = (() => {
     const acc: Record<string, { receita: number; lucro: number }> = {};
-    (monthServices || []).forEach((s: any) => {
+    billingServices.forEach((s: any) => {
       const name = s.vehicle ? `${s.vehicle.model} (${s.vehicle.plate})` : "-";
-      const receita = Number(s.valorCobrado || 0);
-      const custos =
-        Number(s.combustivel || 0) +
-        Number(s.pedagio || 0) +
-        Number(s.estacionamento || 0) +
-        Number(s.alimentacao || 0) +
-        Number(s.outrosCustos || 0);
+      const receita = Number(s.receitaConsolidadaCentavos || 0);
+      const custos = Number(s.custosConsolidadosCentavos || 0);
       acc[name] = acc[name] || { receita: 0, lucro: 0 };
       acc[name].receita += receita;
       acc[name].lucro += receita - custos;
@@ -412,7 +446,7 @@ export default function FinanceDashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
             <MetricCard
               title="Pagamentos pendentes (Serviços)"
-              value={`R$${(sumPendingServicePayments(monthServices) / 100).toFixed(2)}`}
+              value={`R$${(sumPendingServicePayments(billingServices) / 100).toFixed(2)}`}
             />
             <MetricCard
               title="Pagamentos pendentes (Motoristas)"
@@ -469,7 +503,7 @@ export default function FinanceDashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <div className="text-sm text-muted-foreground mb-2">Serviços pendentes</div>
-                  {(monthServices || [])
+                  {billingServices
                     .filter((s: any) => {
                       const st = s.statusPagamento || "pending";
                       if (st === "pay_driver" && s.status === "finished") return false;
@@ -478,7 +512,7 @@ export default function FinanceDashboardPage() {
                     .slice(0, 5)
                     .map((s: any) => (
                       <div key={s.id} className="flex justify-between items-center py-1">
-                        <div className="text-sm">{new Date(s.dateTime).toLocaleDateString("pt-BR")} • {s.clientName} • {(Number(s.valorCobrado || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div>
+                        <div className="text-sm">{new Date(s.dateTime).toLocaleDateString("pt-BR")} • {s.clientName} • {(Number(s.receitaConsolidadaCentavos || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div>
                         <Button
                           size="sm"
                           variant="outline"
@@ -666,7 +700,7 @@ function sumPendingServicePayments(services?: any[]) {
   if (!services) return 0;
   return services.reduce((acc, s) => {
     const status = s.statusPagamento || "pending";
-    const valor = Number(s.valorCobrado || 0);
+    const valor = Number(s.receitaConsolidadaCentavos ?? s.valorCobrado ?? 0);
     if (status === "pay_driver" && s.status === "finished") return acc;
     return status !== "paid" && status !== "saldo" ? acc + valor : acc;
   }, 0);

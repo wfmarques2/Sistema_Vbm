@@ -32,14 +32,14 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Plus, Search, Filter, Pencil, Trash2, CalendarIcon, ChevronDown, DollarSign, MoreHorizontal, Download } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertServiceSchema, serviceTypeEnum, paymentMethodEnum, serviceStatusEnum, paymentStatusEnum } from "@shared/schema";
 import * as XLSX from "xlsx";
 import { useToast } from "@/hooks/use-toast";
-import { useUpdateServiceExpenses, useFinanceProfit, useCreateUnifiedExpense, buildUrl, useCreateDriverPayment } from "@/hooks/use-financial";
+import { useUpdateServiceExpenses, useCreateUnifiedExpense, buildUrl, useCreateDriverPayment } from "@/hooks/use-financial";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -47,6 +47,7 @@ import { DateQuickFilters } from "@/components/date-quick-filters";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function ServicesPage() {
+  const [location, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [valueDisplay, setValueDisplay] = useState("R$ 0,00");
   const [start, setStart] = useState<string>("");
@@ -305,6 +306,18 @@ export default function ServicesPage() {
     setIsFinanceDialogOpen(true);
   };
 
+  useEffect(() => {
+    const query = location.includes("?") ? location.split("?")[1] : "";
+    if (!query) return;
+    const params = new URLSearchParams(query);
+    const financeParam = Number(params.get("finance") || 0);
+    if (!financeParam || !paged?.rows?.length) return;
+    const target = (paged.rows || []).find((s: any) => Number(s.id) === financeParam);
+    if (!target) return;
+    openFinanceDialog(target);
+    setLocation("/services");
+  }, [location, paged?.rows]);
+
   const toCentavos = (display: string) => {
     const digits = display.replace(/\D/g, "");
     const cents = digits ? parseInt(digits, 10) : 0;
@@ -312,6 +325,10 @@ export default function ServicesPage() {
   };
 
   const handleEdit = (service: any) => {
+    if (service?.isReturn) {
+      openFinanceDialog(service);
+      return;
+    }
     setLocation(`/services/${service.id}/edit`);
   };
 
@@ -329,6 +346,87 @@ export default function ServicesPage() {
       s.destination.toLowerCase().includes(q);
     return matchesText;
   });
+  const displayServices = useMemo(() => {
+    const rows = filteredServices || [];
+    const parents = rows.filter((s: any) => !s.isReturn);
+    const grouped = new Map<number, any[]>();
+    rows
+      .filter((s: any) => s.isReturn && s.parentServiceId)
+      .forEach((s: any) => {
+        const key = Number(s.parentServiceId);
+        const arr = grouped.get(key) || [];
+        arr.push(s);
+        grouped.set(key, arr);
+      });
+    const result: any[] = [];
+    for (const parent of parents) {
+      result.push(parent);
+      const childs = (grouped.get(Number(parent.id)) || []).sort(
+        (a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
+      );
+      result.push(...childs);
+    }
+    const parentIds = new Set(parents.map((s: any) => Number(s.id)));
+    const orphans = rows
+      .filter((s: any) => s.isReturn && (!s.parentServiceId || !parentIds.has(Number(s.parentServiceId))))
+      .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+    return [...result, ...orphans];
+  }, [filteredServices]);
+  const servicesById = useMemo(() => {
+    const map = new Map<number, any>();
+    for (const s of filteredServices || []) {
+      map.set(Number(s.id), s);
+    }
+    return map;
+  }, [filteredServices]);
+  const returnServicesByParent = useMemo(() => {
+    const map = new Map<number, any[]>();
+    for (const s of filteredServices || []) {
+      if (!s.isReturn || !s.parentServiceId) continue;
+      const key = Number(s.parentServiceId);
+      const arr = map.get(key) || [];
+      arr.push(s);
+      map.set(key, arr);
+    }
+    return map;
+  }, [filteredServices]);
+
+  const getDirectValueCents = (service: any) => {
+    if (typeof service.valorCobrado === "number" && service.valorCobrado > 0) return Number(service.valorCobrado);
+    const parsed = Math.round(Number(service.value || 0) * 100);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const getDirectExpenseCents = (service: any) =>
+    Number(service.combustivel || 0) +
+    Number(service.pedagio || 0) +
+    Number(service.estacionamento || 0) +
+    Number(service.alimentacao || 0) +
+    Number(service.outrosCustos || 0);
+  const getFinancialView = (service: any) => {
+    if (service.isReturn) {
+      const parent = servicesById.get(Number(service.parentServiceId || 0));
+      return {
+        valueCents: 0,
+        expenseCents: getDirectExpenseCents(service),
+        resultCents: 0,
+        isReturn: true,
+        parentId: parent?.id,
+      };
+    }
+    const returns = returnServicesByParent.get(Number(service.id)) || [];
+    const valueCents = getDirectValueCents(service);
+    const ownExpenses = getDirectExpenseCents(service);
+    const returnExpenses = returns.reduce((sum, r) => sum + getDirectExpenseCents(r), 0);
+    const expenseCents = ownExpenses + returnExpenses;
+    return {
+      valueCents,
+      expenseCents,
+      resultCents: valueCents - expenseCents,
+      isReturn: false,
+      returnCount: returns.length,
+      returnExpenses,
+    };
+  };
 
   const exportServicesXlsx = () => {
     const rows = (filteredServices || []).map((service: any) => {
@@ -426,7 +524,6 @@ export default function ServicesPage() {
     }
   };
 
-  const [, setLocation] = useLocation();
   return (
     <Layout>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
@@ -905,14 +1002,29 @@ export default function ServicesPage() {
           <TableBody>
             {isLoading ? (
                <TableRow><TableCell colSpan={11} className="text-center py-8">Carregando serviços...</TableCell></TableRow>
-            ) : filteredServices?.length === 0 ? (
+            ) : displayServices.length === 0 ? (
               <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum serviço encontrado.</TableCell></TableRow>
             ) : (
-              filteredServices?.map((service) => (
+              displayServices.map((service, index) => {
+                const prevService = index > 0 ? displayServices[index - 1] : null;
+                const nextService = index < displayServices.length - 1 ? displayServices[index + 1] : null;
+                const isAttachedReturn = Boolean(
+                  service.isReturn &&
+                  prevService &&
+                  Number(service.parentServiceId || 0) === Number(prevService.id || 0)
+                );
+                const hasLinkedReturn = Boolean(
+                  !service.isReturn &&
+                  nextService &&
+                  nextService.isReturn &&
+                  Number(nextService.parentServiceId || 0) === Number(service.id || 0)
+                );
+                const finance = getFinancialView(service);
+                return (
                 <>
                 <TableRow 
                   key={`main-${service.id}`} 
-                  className="group hover:bg-muted/30 transition-colors cursor-pointer"
+                  className={`group hover:bg-muted/30 transition-colors cursor-pointer ${service.isReturn ? "bg-sky-50 hover:bg-sky-100 dark:bg-[#253744] dark:hover:bg-[#2c4352]" : ""} ${hasLinkedReturn ? "bg-cyan-50/60 border-b-cyan-300/70 dark:bg-[#1e2f39]/40 dark:border-b-cyan-700/50" : ""} ${isAttachedReturn ? "border-t-0" : ""}`}
                   onClick={() => handleEdit(service)}
                 >
                   <TableCell className="w-10">
@@ -925,16 +1037,24 @@ export default function ServicesPage() {
                       <ChevronDown className={`w-4 h-4 transition-transform ${expandedId === service.id ? "rotate-180" : ""}`} />
                     </Button>
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">#{String(service.id).padStart(4, "0")}</TableCell>
-                  <TableCell>
+                  <TableCell className={`font-mono text-xs text-muted-foreground ${service.isReturn ? "pl-6" : ""}`}>
+                    <div className="flex items-center gap-2">
+                      <span>{service.isReturn ? "↳ " : ""}#{String(service.id).padStart(4, "0")}</span>
+                      {hasLinkedReturn && <Badge variant="outline" className="text-[10px] border-cyan-700/60 text-cyan-300">IDA+RETORNO</Badge>}
+                      {isAttachedReturn && <Badge variant="outline" className="text-[10px] border-cyan-700/60 text-cyan-300">RETORNO</Badge>}
+                    </div>
+                  </TableCell>
+                  <TableCell className={service.isReturn ? "pl-6" : ""}>
                     <div className="flex flex-col">
                       <span className="font-medium">{format(new Date(service.dateTime), 'dd/MM/yyyy', { locale: ptBR })}</span>
                       <span className="text-xs text-muted-foreground">{format(new Date(service.dateTime), 'HH:mm', { locale: ptBR })}</span>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={service.isReturn ? "pl-6" : ""}>
                     <div className="flex flex-col">
-                      <span className="font-medium">{formatPassengerNames(service.clientName)}</span>
+                      <span className="font-medium">
+                        {formatPassengerNames(service.clientName)}{service.isReturn ? " • Retorno" : ""}
+                      </span>
                       <span className="text-xs text-muted-foreground">{service.clientPhone}</span>
                     </div>
                   </TableCell>
@@ -955,32 +1075,34 @@ export default function ServicesPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {(() => {
-                      const num =
-                        typeof service.valorCobrado === "number" && service.valorCobrado > 0
-                          ? service.valorCobrado / 100
-                          : Number(service.value || 0);
-                      const brl = num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-                      return <span className="font-medium">{brl}</span>;
-                    })()}
+                    {service.isReturn ? (
+                      <span className="text-xs text-muted-foreground">Incluso na ida</span>
+                    ) : (
+                      <span className="font-medium">
+                        {(finance.valueCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
-                    {(() => {
-                      const sum =
-                        (service.combustivel || 0) +
-                        (service.pedagio || 0) +
-                        (service.estacionamento || 0) +
-                        (service.alimentacao || 0) +
-                        (service.outrosCustos || 0);
-                      return (
-                        <span>
-                          {(sum / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    <div className="flex flex-col">
+                      <span>
+                        {(finance.expenseCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                      {!service.isReturn && finance.returnExpenses > 0 && (
+                        <span className="text-[11px] text-muted-foreground">
+                          inclui retorno: {(finance.returnExpenses / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                         </span>
-                      );
-                    })()}
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <ServiceFinanceCell serviceId={service.id} />
+                    {service.isReturn ? (
+                      <span className="text-xs text-muted-foreground">Consolidado na ida</span>
+                    ) : (
+                      <span className={finance.resultCents < 0 ? "text-red-600 font-medium" : "text-green-600 font-medium"}>
+                        {(finance.resultCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>{getStatusBadge(service.status)}</TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
@@ -992,16 +1114,20 @@ export default function ServicesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setLocation(`/services/${service.id}/edit`)}>
-                          <Pencil className="w-4 h-4 text-blue-600" /> Editar
-                        </DropdownMenuItem>
+                        {!service.isReturn && (
+                          <DropdownMenuItem onClick={() => setLocation(`/services/${service.id}/edit`)}>
+                            <Pencil className="w-4 h-4 text-blue-600" /> Editar
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => openFinanceDialog(service)}>
                           <DollarSign className="w-4 h-4 text-green-600" /> Despesas
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => window.open(`/services/${service.id}/voucher`, "_blank")}>
-                          PDF Voucher
-                        </DropdownMenuItem>
-                        {((service.statusPagamento || "pending") !== "paid" && (service.statusPagamento || "pending") !== "saldo") && (
+                        {!service.isReturn && (
+                          <DropdownMenuItem onClick={() => window.open(`/services/${service.id}/voucher`, "_blank")}>
+                            PDF Voucher
+                          </DropdownMenuItem>
+                        )}
+                        {!service.isReturn && ((service.statusPagamento || "pending") !== "paid" && (service.statusPagamento || "pending") !== "saldo") && (
                           <DropdownMenuItem
                             onClick={async () => {
                               try {
@@ -1015,7 +1141,7 @@ export default function ServicesPage() {
                             Marcar pago
                           </DropdownMenuItem>
                         )}
-                        {service.statusPagamento === "partial" && service.restanteMetodo === "pay_driver" && service.driverId && (
+                        {!service.isReturn && service.statusPagamento === "partial" && service.restanteMetodo === "pay_driver" && service.driverId && (
                           <DropdownMenuItem
                             onClick={async () => {
                               const total = Number(service.valorCobrado || 0) > 0 ? Number(service.valorCobrado || 0) : Math.round(Number(service.value || 0) * 100);
@@ -1097,7 +1223,7 @@ export default function ServicesPage() {
                   </TableRow>
                 )}
                 </>
-              ))
+              )})
             )}
           </TableBody>
         </Table>
@@ -1106,15 +1232,36 @@ export default function ServicesPage() {
         <div className="md:hidden space-y-3">
           {isLoading ? (
             <div className="text-center py-8">Carregando serviços...</div>
-          ) : filteredServices?.length === 0 ? (
+            ) : displayServices.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Nenhum serviço encontrado.</div>
           ) : (
-            filteredServices?.map((service) => (
-              <div key={`card-${service.id}`} className="rounded-lg border bg-card p-3">
+            displayServices.map((service, index) => {
+              const prevService = index > 0 ? displayServices[index - 1] : null;
+              const nextService = index < displayServices.length - 1 ? displayServices[index + 1] : null;
+              const isAttachedReturn = Boolean(
+                service.isReturn &&
+                prevService &&
+                Number(service.parentServiceId || 0) === Number(prevService.id || 0)
+              );
+              const hasLinkedReturn = Boolean(
+                !service.isReturn &&
+                nextService &&
+                nextService.isReturn &&
+                Number(nextService.parentServiceId || 0) === Number(service.id || 0)
+              );
+              const finance = getFinancialView(service);
+              return (
+              <div key={`card-${service.id}`} className={`rounded-lg border bg-card p-3 ${isAttachedReturn ? "ml-4 border-l-4 border-l-cyan-500 dark:border-l-cyan-500" : ""} ${service.isReturn ? "bg-sky-50 border-cyan-300/60 dark:bg-[#253744] dark:border-cyan-800/60" : ""} ${hasLinkedReturn ? "bg-cyan-50/60 border-b-cyan-300/70 dark:bg-[#1e2f39]/40 dark:border-b-cyan-700/50" : ""}`}>
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="text-xs text-muted-foreground">#{String(service.id).padStart(4, "0")}</div>
-                    <div className="font-medium">{format(new Date(service.dateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</div>
+                    <div className="font-medium">
+                      {format(new Date(service.dateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}{service.isReturn ? " • Retorno" : ""}
+                    </div>
+                    <div className="mt-1">
+                      {hasLinkedReturn && <Badge variant="outline" className="text-[10px] border-cyan-700/60 text-cyan-300">IDA+RETORNO</Badge>}
+                      {isAttachedReturn && <Badge variant="outline" className="text-[10px] border-cyan-700/60 text-cyan-300">RETORNO</Badge>}
+                    </div>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -1124,16 +1271,20 @@ export default function ServicesPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setLocation(`/services/${service.id}/edit`)}>
-                        <Pencil className="w-4 h-4 text-blue-600" /> Editar
-                      </DropdownMenuItem>
+                      {!service.isReturn && (
+                        <DropdownMenuItem onClick={() => setLocation(`/services/${service.id}/edit`)}>
+                          <Pencil className="w-4 h-4 text-blue-600" /> Editar
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => openFinanceDialog(service)}>
                         <DollarSign className="w-4 h-4 text-green-600" /> Despesas
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => window.open(`/services/${service.id}/voucher`, "_blank")}>
-                        PDF Voucher
-                      </DropdownMenuItem>
-                      {((service.statusPagamento || "pending") !== "paid" && (service.statusPagamento || "pending") !== "saldo") && (
+                      {!service.isReturn && (
+                        <DropdownMenuItem onClick={() => window.open(`/services/${service.id}/voucher`, "_blank")}>
+                          PDF Voucher
+                        </DropdownMenuItem>
+                      )}
+                      {!service.isReturn && ((service.statusPagamento || "pending") !== "paid" && (service.statusPagamento || "pending") !== "saldo") && (
                         <DropdownMenuItem
                           onClick={async () => {
                             try {
@@ -1147,7 +1298,7 @@ export default function ServicesPage() {
                           Marcar pago
                         </DropdownMenuItem>
                       )}
-                      {service.statusPagamento === "partial" && service.restanteMetodo === "pay_driver" && service.driverId && (
+                      {!service.isReturn && service.statusPagamento === "partial" && service.restanteMetodo === "pay_driver" && service.driverId && (
                         <DropdownMenuItem
                           onClick={async () => {
                             const total = Number(service.valorCobrado || 0) > 0 ? Number(service.valorCobrado || 0) : Math.round(Number(service.value || 0) * 100);
@@ -1203,21 +1354,35 @@ export default function ServicesPage() {
                 </div>
                 <div className="mt-2 flex justify-between items-center">
                   <div className="text-sm">
-                    {(() => {
-                      const num =
-                        typeof service.valorCobrado === "number" && service.valorCobrado > 0
-                          ? service.valorCobrado / 100
-                          : Number(service.value || 0);
-                      return <span className="font-semibold">R$ {num.toFixed(2)}</span>;
-                    })()}
+                    {service.isReturn ? (
+                      <span className="text-xs text-muted-foreground">Valor incluso na ida</span>
+                    ) : (
+                      <span className="font-semibold">
+                        {(finance.valueCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </span>
+                    )}
                   </div>
                   <div>{getStatusBadge(service.status)}</div>
                 </div>
                 <div className="mt-2">
-                  <ServiceFinanceCell serviceId={service.id} />
+                  {service.isReturn ? (
+                    <div className="text-xs text-muted-foreground">
+                      Despesas desta corrida são consolidadas no resultado da ida.
+                    </div>
+                  ) : (
+                    <div className="text-sm space-y-1">
+                      <div>
+                        <span className="text-muted-foreground">Despesas:</span>{" "}
+                        {(finance.expenseCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </div>
+                      <div className={finance.resultCents < 0 ? "text-red-600 font-medium" : "text-green-600 font-medium"}>
+                        Resultado: {(finance.resultCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))
+            )})
           )}
         </div>
         <div className="flex justify-between items-center mt-4">
@@ -1310,17 +1475,5 @@ export default function ServicesPage() {
         </DialogContent>
       </Dialog>
     </Layout>
-  );
-}
-
-// (excluído) listagem inline de pagamentos de motorista — agora embutidos nas despesas comuns
-function ServiceFinanceCell({ serviceId }: { serviceId: number }) {
-  const { data, isLoading } = useFinanceProfit(serviceId);
-  if (isLoading || !data) return <span className="text-xs text-muted-foreground">...</span>;
-  const value = (data.lucroCentavos / 100).toFixed(2);
-  return (
-    <span className={data.prejuizo ? "text-red-600 font-medium" : "text-green-600 font-medium"}>
-      R${value}
-    </span>
   );
 }

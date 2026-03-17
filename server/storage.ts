@@ -206,6 +206,8 @@ export class DatabaseStorage implements IStorage {
     driverId?: number,
     vehicleId?: number,
     status?: string,
+    parentServiceId?: number,
+    isReturn?: boolean,
     start?: string,
     end?: string,
     statusPagamento?: string,
@@ -222,6 +224,8 @@ export class DatabaseStorage implements IStorage {
       clientName: services.clientName,
       clientPhone: services.clientPhone,
       clientId: services.clientId,
+      parentServiceId: services.parentServiceId,
+      isReturn: services.isReturn,
       driverId: services.driverId,
       vehicleId: services.vehicleId,
       passengers: services.passengers,
@@ -243,7 +247,13 @@ export class DatabaseStorage implements IStorage {
       valorCobrado: services.valorCobrado,
       formaPagamento: services.formaPagamento,
       statusPagamento: services.statusPagamento,
+      hasReturn: services.hasReturn,
       returnDateTime: services.returnDateTime,
+      returnOrigin: services.returnOrigin,
+      returnDestination: services.returnDestination,
+      returnFlight: services.returnFlight,
+      returnDriverId: services.returnDriverId,
+      returnVehicleId: services.returnVehicleId,
       guide: services.guide,
       valorPagoParcial: services.valorPagoParcial,
       restanteMetodo: services.restanteMetodo,
@@ -276,6 +286,12 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.vehicleId) {
       conditions.push(eq(services.vehicleId, filters.vehicleId));
+    }
+    if (typeof filters?.parentServiceId === "number") {
+      conditions.push(eq(services.parentServiceId, filters.parentServiceId));
+    }
+    if (typeof filters?.isReturn === "boolean") {
+      conditions.push(eq(services.isReturn, filters.isReturn));
     }
     if (filters?.statusPagamento) {
       conditions.push(eq(services.statusPagamento, filters.statusPagamento as any));
@@ -322,6 +338,8 @@ export class DatabaseStorage implements IStorage {
       clientName: services.clientName,
       clientPhone: services.clientPhone,
       clientId: services.clientId,
+      parentServiceId: services.parentServiceId,
+      isReturn: services.isReturn,
       driverId: services.driverId,
       vehicleId: services.vehicleId,
       passengers: services.passengers,
@@ -343,7 +361,13 @@ export class DatabaseStorage implements IStorage {
       valorCobrado: services.valorCobrado,
       formaPagamento: services.formaPagamento,
       statusPagamento: services.statusPagamento,
+      hasReturn: services.hasReturn,
       returnDateTime: services.returnDateTime,
+      returnOrigin: services.returnOrigin,
+      returnDestination: services.returnDestination,
+      returnFlight: services.returnFlight,
+      returnDriverId: services.returnDriverId,
+      returnVehicleId: services.returnVehicleId,
       guide: services.guide,
       valorPagoParcial: services.valorPagoParcial,
       restanteMetodo: services.restanteMetodo,

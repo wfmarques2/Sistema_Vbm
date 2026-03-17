@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertServiceSchema, paymentMethodEnum, serviceStatusEnum, paymentStatusEnum } from "@shared/schema";
 import { z } from "zod";
-import { useCreateService, useUpdateService } from "@/hooks/use-services";
+import { useCreateService, useDeleteService, useUpdateService } from "@/hooks/use-services";
 import { useDrivers } from "@/hooks/use-drivers";
 import { useVehicles } from "@/hooks/use-vehicles";
 import { useClients, useClientDependents, useCreateClient, useCreateClientDependent } from "@/hooks/use-clients";
@@ -30,8 +31,11 @@ export default function ServiceEditPage() {
   const createClient = useCreateClient();
   const createMutation = useCreateService();
   const updateMutation = useUpdateService();
+  const deleteMutation = useDeleteService();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [returnServiceId, setReturnServiceId] = useState<number | null>(null);
+  const [currentIsReturnService, setCurrentIsReturnService] = useState(false);
 
   const [valueDisplay, setValueDisplay] = useState("R$ 0,00");
   const [dateTimeInput, setDateTimeInput] = useState<string>("");
@@ -63,11 +67,17 @@ export default function ServiceEditPage() {
   const serviceFormSchema = (isEdit ? insertServiceSchema.partial() : insertServiceSchema).extend({
     driverId: z.union([z.string(), z.number()]).nullable().optional(),
     vehicleId: z.union([z.string(), z.number()]).nullable().optional(),
+    returnDriverId: z.union([z.string(), z.number()]).nullable().optional(),
+    returnVehicleId: z.union([z.string(), z.number()]).nullable().optional(),
     clientId: z.union([z.string(), z.number()]).nullable().optional(),
     value: z.union([z.string(), z.number()]),
     kmPrevisto: z.union([z.string(), z.number()]).optional(),
     guide: z.string().nullable().optional(),
+    hasReturn: z.boolean().optional(),
     returnDateTime: z.union([z.date(), z.string()]).optional(),
+    returnOrigin: z.string().optional(),
+    returnDestination: z.string().optional(),
+    returnFlight: z.string().optional(),
     paxAdt: z.union([z.string(), z.number()]).optional(),
     paxChd: z.union([z.string(), z.number()]).optional(),
     paxInf: z.union([z.string(), z.number()]).optional(),
@@ -89,12 +99,18 @@ export default function ServiceEditPage() {
       paymentMethod: "pix",
       status: "scheduled",
       statusPagamento: "pending",
+      hasReturn: false,
       driverId: "",
       vehicleId: "",
+      returnDriverId: "",
+      returnVehicleId: "",
       kmPrevisto: "",
       notes: "",
       guide: "",
       flight: "",
+      returnOrigin: "",
+      returnDestination: "",
+      returnFlight: "",
       passengers: 0,
       bags: 0,
       paxAdt: "",
@@ -113,28 +129,57 @@ export default function ServiceEditPage() {
       if (!res.ok) return;
       const service = await res.json();
       if (!mounted) return;
+      const isCurrentReturn = Boolean(service.isReturn);
+      setCurrentIsReturnService(isCurrentReturn);
+      setReturnServiceId(null);
+      if (isCurrentReturn) {
+        toast({
+          title: "Viagem de retorno",
+          description: "Para retorno, utilize apenas a edição de despesas.",
+        });
+        navigate(`/services?finance=${id}`);
+        return;
+      }
       const amount =
         typeof service.valorCobrado === "number" && service.valorCobrado > 0
           ? service.valorCobrado / 100
           : Number(service.value || 0);
       const paymentMethodNorm = service.formaPagamento || service.paymentMethod || "pix";
+      let returnService: any = null;
+      if (!isCurrentReturn) {
+        try {
+          const childRes = await fetch(`/api/services?parentServiceId=${id}&isReturn=true&limit=1`, { credentials: "include" });
+          if (childRes.ok) {
+            const childRows = await childRes.json();
+            returnService = Array.isArray(childRows) ? childRows[0] : null;
+          }
+        } catch {}
+      }
+      const hasReturnNorm = Boolean(returnService);
+      if (returnService?.id) setReturnServiceId(Number(returnService.id));
       form.reset({
         ...service,
         paymentMethod: paymentMethodNorm,
         statusPagamento: service.statusPagamento || "pending",
         status: service.status || "scheduled",
+        hasReturn: hasReturnNorm,
         value: amount.toFixed(2),
         driverId: service.driverId?.toString(),
         vehicleId: service.vehicleId?.toString(),
+        returnDriverId: returnService?.driverId?.toString() ?? "",
+        returnVehicleId: returnService?.vehicleId?.toString() ?? "",
         clientId: service.clientId?.toString(),
         dateTime: new Date(service.dateTime),
-        returnDateTime: service.returnDateTime ? new Date(service.returnDateTime) : undefined,
+        returnDateTime: returnService?.dateTime ? new Date(returnService.dateTime) : undefined,
+        returnOrigin: returnService?.origin ?? "",
+        returnDestination: returnService?.destination ?? "",
+        returnFlight: returnService?.flight ?? "",
         kmPrevisto: service.kmPrevisto != null ? String(service.kmPrevisto) : "",
         guide: service.guide ?? "",
         restanteMetodoDriver: service.restanteMetodoDriver ?? undefined,
       });
       setDateTimeInput(format(new Date(service.dateTime), "yyyy-MM-dd'T'HH:mm"));
-      setReturnInput(service.returnDateTime ? format(new Date(service.returnDateTime), "yyyy-MM-dd'T'HH:mm") : "");
+      setReturnInput(returnService?.dateTime ? format(new Date(returnService.dateTime), "yyyy-MM-dd'T'HH:mm") : "");
       setValueDisplay(
         (isFinite(amount) ? amount : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
       );
@@ -260,6 +305,7 @@ export default function ServiceEditPage() {
     const manualPassengerCount = Number(values.passengers ?? 0) || 0;
     const passengersFinal = Math.max(manualPassengerCount, passengerCountFromNames);
 
+    const hasReturn = Boolean(values.hasReturn) && !currentIsReturnService;
     const payload = {
       ...values,
       clientName: passengerNames.join(" & ") || values.clientName,
@@ -268,9 +314,17 @@ export default function ServiceEditPage() {
       kmPrevisto: values.kmPrevisto != null && values.kmPrevisto !== "" ? String(values.kmPrevisto).replace(",", ".") : undefined,
       driverId: values.driverId ? parseInt(values.driverId) : undefined,
       vehicleId: values.vehicleId ? parseInt(values.vehicleId) : undefined,
+      hasReturn,
+      isReturn: currentIsReturnService,
+      parentServiceId: currentIsReturnService ? values.parentServiceId : undefined,
       clientId: clientIdFinal,
       dateTime: new Date(values.dateTime),
-      returnDateTime: values.returnDateTime ? new Date(values.returnDateTime as any) : undefined,
+      returnDateTime: undefined,
+      returnOrigin: undefined,
+      returnDestination: undefined,
+      returnFlight: undefined,
+      returnDriverId: undefined,
+      returnVehicleId: undefined,
       guide: values.guide ? String(values.guide).trim() : undefined,
       flight: values.flight ? String(values.flight).trim() : undefined,
       passengers: passengersFinal || undefined,
@@ -291,10 +345,52 @@ export default function ServiceEditPage() {
     try {
       setSaving(true);
       toast({ title: isEdit ? "Atualizando serviço" : "Criando serviço", description: "Enviando dados..." });
+      let mainService: any;
       if (isEdit && id) {
-        await updateMutation.mutateAsync({ id, ...payload });
+        mainService = await updateMutation.mutateAsync({ id, ...payload });
       } else {
-        await createMutation.mutateAsync(payload);
+        mainService = await createMutation.mutateAsync(payload);
+      }
+      if (!currentIsReturnService) {
+        const returnPayload = hasReturn && values.returnDateTime && values.returnOrigin && values.returnDestination
+          ? {
+              dateTime: new Date(values.returnDateTime as any),
+              origin: String(values.returnOrigin || "").trim(),
+              destination: String(values.returnDestination || "").trim(),
+              type: values.type,
+              clientName: passengerNames.join(" & ") || values.clientName,
+              clientPhone: clientPhoneFinal || values.clientPhone,
+              clientId: clientIdFinal,
+              parentServiceId: Number(mainService?.id || id),
+              isReturn: true,
+              hasReturn: false,
+              value: "0.00",
+              paymentMethod: values.paymentMethod,
+              status: "scheduled" as const,
+              statusPagamento: "pending" as const,
+              driverId: values.returnDriverId ? parseInt(values.returnDriverId) : undefined,
+              vehicleId: values.returnVehicleId ? parseInt(values.returnVehicleId) : undefined,
+              flight: values.returnFlight ? String(values.returnFlight).trim() : undefined,
+              guide: values.guide ? String(values.guide).trim() : undefined,
+              notes: values.notes ? String(values.notes).trim() : undefined,
+              passengers: passengersFinal || undefined,
+              bags: Number(values.bags ?? 0) || undefined,
+              paxAdt: Number(values.paxAdt ?? 0) || undefined,
+              paxChd: Number(values.paxChd ?? 0) || undefined,
+              paxInf: Number(values.paxInf ?? 0) || undefined,
+              paxSen: Number(values.paxSen ?? 0) || undefined,
+              paxFree: Number(values.paxFree ?? 0) || undefined,
+            }
+          : null;
+        if (returnPayload) {
+          if (returnServiceId) {
+            await updateMutation.mutateAsync({ id: returnServiceId, ...returnPayload });
+          } else {
+            await createMutation.mutateAsync(returnPayload as any);
+          }
+        } else if (returnServiceId) {
+          await deleteMutation.mutateAsync(returnServiceId);
+        }
       }
       navigate("/services");
     } catch (err: any) {
@@ -330,158 +426,153 @@ export default function ServiceEditPage() {
       <div className="max-w-4xl">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="clientName" render={({ field }) => (
-                <FormItem><FormLabel>Nome do Cliente</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="clientPhone" render={({ field }) => (
-                <FormItem><FormLabel>Telefone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-            </div>
-            <FormField control={form.control} name="clientId" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Cliente (cadastrado)</FormLabel>
-                <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
-                  <FormControl><SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {clients?.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name} ({c.phone})</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
-            {Number(selectedClientId || 0) > 0 && (
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Passageiro principal</label>
-                    <Select value={String(depSelectedId)} onValueChange={(v) => setDepSelectedId(Number(v))}>
-                      <SelectTrigger><SelectValue placeholder="Selecione o passageiro" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0">— Titular ({form.watch("clientName") || "Cliente"}) —</SelectItem>
-                        {(dependents || []).map((d: any) => (
-                          <SelectItem key={d.id} value={String(d.id)}>{d.name}{d.phone ? ` (${d.phone})` : ""}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Adicionar dependente existente</label>
-                    <div className="grid grid-cols-[1fr_auto] gap-2">
-                      <Select value={String(extraDependentId)} onValueChange={(v) => setExtraDependentId(Number(v))}>
-                        <SelectTrigger><SelectValue placeholder="Selecione dependente" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">Selecione</SelectItem>
-                          {(dependents || []).map((d: any) => (
-                            <SelectItem key={d.id} value={String(d.id)}>{d.name}{d.phone ? ` (${d.phone})` : ""}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => {
-                          if (!extraDependentId) return;
-                          const dep = (dependents || []).find((d: any) => Number(d.id) === Number(extraDependentId));
-                          if (!dep) return;
-                          const depName = String(dep.name || "").trim();
-                          if (!depName) return;
-                          const depPhone = String(dep.phone || "").trim();
-                          const exists = extraPassengers.some((p) => String(p.name || "").trim().toLowerCase() === depName.toLowerCase() && String(p.phone || "").replace(/\D/g, "") === depPhone.replace(/\D/g, ""));
-                          if (!exists) {
-                            setExtraPassengers((prev) => [...prev, { name: depName, phone: depPhone || undefined }]);
-                          }
-                          setExtraDependentId(0);
-                        }}
-                      >
-                        Adicionar
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_220px_auto] gap-2">
-                  <div>
-                    <label className="text-sm font-medium">Novo passageiro (nome)</label>
-                    <Input value={newDepName} onChange={(e) => setNewDepName(e.target.value)} placeholder="Nome completo" />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Telefone (opcional)</label>
-                    <Input value={newDepPhone} onChange={(e) => setNewDepPhone(e.target.value)} placeholder="(11) 99999-9999" />
-                  </div>
-                  <div className="flex items-end">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => {
-                        const name = newDepName.trim();
-                        if (!name) return;
-                        const phone = newDepPhone.trim();
-                        const exists = extraPassengers.some((p) => String(p.name || "").trim().toLowerCase() === name.toLowerCase() && String(p.phone || "").replace(/\D/g, "") === phone.replace(/\D/g, ""));
-                        if (!exists) {
-                          setExtraPassengers((prev) => [...prev, { name, phone: phone || undefined }]);
-                        }
-                        setNewDepName("");
-                        setNewDepPhone("");
-                      }}
-                    >
-                      Adicionar passageiro
-                    </Button>
-                  </div>
-                </div>
-                {extraPassengers.length > 0 && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Passageiros adicionais</label>
-                    <div className="space-y-1">
-                      {extraPassengers.map((p, idx) => (
-                        <div key={`${p.name}-${p.phone || ""}-${idx}`} className="flex items-center justify-between rounded border border-border px-3 py-2 text-sm">
-                          <span>{p.name}{p.phone ? ` (${p.phone})` : ""}</span>
-                          <Button type="button" variant="ghost" onClick={() => setExtraPassengers((prev) => prev.filter((_, i) => i !== idx))}>
-                            Remover
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            <div className="rounded-lg border border-border/70 p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-primary">Cliente e Passageiros</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="clientName" render={({ field }) => (
+                  <FormItem><FormLabel>Nome do Cliente</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="clientPhone" render={({ field }) => (
+                  <FormItem><FormLabel>Telefone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
               </div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="dateTime" render={({ field }) => (
+              <FormField control={form.control} name="clientId" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Data e Hora</FormLabel>
-                  <FormControl>
-                    <Input type="datetime-local" value={dateTimeInput || (field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : "")}
-                      onChange={(e) => { const v = e.target.value; setDateTimeInput(v); if (!v) { field.onChange(undefined); return; } if (v.length >= 16) { const d = new Date(v); if (!isNaN(d.getTime())) field.onChange(d); }}} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="type" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo</FormLabel>
+                  <FormLabel>Cliente (cadastrado)</FormLabel>
                   <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      <SelectItem value="corporate">Executivo</SelectItem>
-                      <SelectItem value="airport">Privativo</SelectItem>
+                      {clients?.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name} ({c.phone})</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )} />
+              {Number(selectedClientId || 0) > 0 && (
+                <div className="space-y-3 rounded-md border border-border/60 p-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Passageiro principal</label>
+                      <Select value={String(depSelectedId)} onValueChange={(v) => setDepSelectedId(Number(v))}>
+                        <SelectTrigger><SelectValue placeholder="Selecione o passageiro" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">— Titular ({form.watch("clientName") || "Cliente"}) —</SelectItem>
+                          {(dependents || []).map((d: any) => (
+                            <SelectItem key={d.id} value={String(d.id)}>{d.name}{d.phone ? ` (${d.phone})` : ""}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Adicionar dependente existente</label>
+                      <div className="grid grid-cols-[1fr_auto] gap-2">
+                        <Select value={String(extraDependentId)} onValueChange={(v) => setExtraDependentId(Number(v))}>
+                          <SelectTrigger><SelectValue placeholder="Selecione dependente" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">Selecione</SelectItem>
+                            {(dependents || []).map((d: any) => (
+                              <SelectItem key={d.id} value={String(d.id)}>{d.name}{d.phone ? ` (${d.phone})` : ""}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => {
+                            if (!extraDependentId) return;
+                            const dep = (dependents || []).find((d: any) => Number(d.id) === Number(extraDependentId));
+                            if (!dep) return;
+                            const depName = String(dep.name || "").trim();
+                            if (!depName) return;
+                            const depPhone = String(dep.phone || "").trim();
+                            const exists = extraPassengers.some((p) => String(p.name || "").trim().toLowerCase() === depName.toLowerCase() && String(p.phone || "").replace(/\D/g, "") === depPhone.replace(/\D/g, ""));
+                            if (!exists) {
+                              setExtraPassengers((prev) => [...prev, { name: depName, phone: depPhone || undefined }]);
+                            }
+                            setExtraDependentId(0);
+                          }}
+                        >
+                          Adicionar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_220px_auto] gap-2">
+                    <div>
+                      <label className="text-sm font-medium">Novo passageiro (nome)</label>
+                      <Input value={newDepName} onChange={(e) => setNewDepName(e.target.value)} placeholder="Nome completo" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Telefone (opcional)</label>
+                      <Input value={newDepPhone} onChange={(e) => setNewDepPhone(e.target.value)} placeholder="(11) 99999-9999" />
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-full"
+                        onClick={() => {
+                          const name = newDepName.trim();
+                          if (!name) return;
+                          const phone = newDepPhone.trim();
+                          const exists = extraPassengers.some((p) => String(p.name || "").trim().toLowerCase() === name.toLowerCase() && String(p.phone || "").replace(/\D/g, "") === phone.replace(/\D/g, ""));
+                          if (!exists) {
+                            setExtraPassengers((prev) => [...prev, { name, phone: phone || undefined }]);
+                          }
+                          setNewDepName("");
+                          setNewDepPhone("");
+                        }}
+                      >
+                        Adicionar passageiro
+                      </Button>
+                    </div>
+                  </div>
+                  {extraPassengers.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Passageiros adicionais</label>
+                      <div className="space-y-1">
+                        {extraPassengers.map((p, idx) => (
+                          <div key={`${p.name}-${p.phone || ""}-${idx}`} className="flex items-center justify-between rounded border border-border px-3 py-2 text-sm">
+                            <span>{p.name}{p.phone ? ` (${p.phone})` : ""}</span>
+                            <Button type="button" variant="ghost" onClick={() => setExtraPassengers((prev) => prev.filter((_, i) => i !== idx))}>
+                              Remover
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="returnDateTime" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Retorno (opcional)</FormLabel>
-                  <FormControl>
-                    <Input type="datetime-local" value={returnInput || (field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : "")}
-                      onChange={(e) => { const v = e.target.value; setReturnInput(v); if (!v) { field.onChange(undefined); return; } if (v.length >= 16) { const d = new Date(v); if (!isNaN(d.getTime())) field.onChange(d); }}} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+            <div className="rounded-lg border border-border/70 p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-primary">Agendamento</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="dateTime" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data e Hora</FormLabel>
+                    <FormControl>
+                      <Input type="datetime-local" value={dateTimeInput || (field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : "")}
+                        onChange={(e) => { const v = e.target.value; setDateTimeInput(v); if (!v) { field.onChange(undefined); return; } if (v.length >= 16) { const d = new Date(v); if (!isNaN(d.getTime())) field.onChange(d); }}}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="type" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo</FormLabel>
+                    <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="corporate">Executivo</SelectItem>
+                        <SelectItem value="airport">Privativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
               <FormField control={form.control} name="guide" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Guia (opcional)</FormLabel>
@@ -489,7 +580,101 @@ export default function ServiceEditPage() {
                   <FormMessage />
                 </FormItem>
               )} />
+              {!currentIsReturnService ? (
+                <FormField
+                  control={form.control}
+                  name="hasReturn"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border border-border/70 p-3">
+                      <FormControl>
+                        <Checkbox
+                          checked={Boolean(field.value)}
+                          onCheckedChange={(checked) => {
+                            const enabled = Boolean(checked);
+                            field.onChange(enabled);
+                            if (!enabled) {
+                              setReturnInput("");
+                              form.setValue("returnDateTime", undefined);
+                              form.setValue("returnOrigin", "");
+                              form.setValue("returnDestination", "");
+                              form.setValue("returnFlight", "");
+                              form.setValue("returnDriverId", "");
+                              form.setValue("returnVehicleId", "");
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Criar viagem de retorno vinculada</FormLabel>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <div className="rounded-md border border-border/70 p-3 text-sm text-muted-foreground">
+                  Esta é uma viagem de retorno vinculada a outra viagem.
+                </div>
+              )}
+              {!currentIsReturnService && form.watch("hasReturn") && (
+                <div className="rounded-md border border-primary/40 bg-primary/5 p-4 space-y-4">
+                  <div className="text-sm font-medium">Viagem de retorno vinculada</div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="returnDateTime" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data/Hora retorno</FormLabel>
+                        <FormControl>
+                          <Input type="datetime-local" value={returnInput || (field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : "")}
+                            onChange={(e) => { const v = e.target.value; setReturnInput(v); if (!v) { field.onChange(undefined); return; } if (v.length >= 16) { const d = new Date(v); if (!isNaN(d.getTime())) field.onChange(d); }}}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="returnFlight" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Voo retorno</FormLabel>
+                        <FormControl><Input value={field.value ?? ""} onChange={field.onChange} placeholder="Ex.: G3 9876" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="returnOrigin" render={({ field }) => (
+                      <FormItem><FormLabel>Origem retorno</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="returnDestination" render={({ field }) => (
+                      <FormItem><FormLabel>Destino retorno</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="returnDriverId" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Motorista retorno</FormLabel>
+                        <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Atribuir motorista" /></SelectTrigger></FormControl>
+                          <SelectContent>{drivers?.map(d => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="returnVehicleId" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Veículo retorno</FormLabel>
+                        <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Atribuir veículo" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {(vehicles || []).map(v => <SelectItem key={v.id} value={v.id.toString()}>{v.model} ({v.plate})</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                </div>
+              )}
             </div>
+            <div className="rounded-lg border border-border/70 p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-primary">Dados da Viagem</h3>
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem>
                 <FormLabel>Observações</FormLabel>
@@ -650,6 +835,9 @@ export default function ServiceEditPage() {
                 </Button>
               </div>
             </div>
+            </div>
+            <div className="rounded-lg border border-border/70 p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-primary">Financeiro e Alocação</h3>
             <div className="grid grid-cols-3 gap-4">
               <FormField control={form.control} name="value" render={() => (
                 <FormItem>
@@ -798,6 +986,7 @@ export default function ServiceEditPage() {
                   <FormMessage />
                 </FormItem>
               )} />
+            </div>
             </div>
             <Button
               type="button"

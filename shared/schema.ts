@@ -87,6 +87,8 @@ export const services = pgTable("services", {
   clientName: text("client_name").notNull(),
   clientPhone: text("client_phone").notNull(),
   clientId: integer("client_id").references(() => clients.id),
+  parentServiceId: integer("parent_service_id"),
+  isReturn: boolean("is_return").default(false).notNull(),
   driverId: integer("driver_id").references(() => drivers.id),
   vehicleId: integer("vehicle_id").references(() => vehicles.id),
   value: decimal("value", { precision: 10, scale: 2 }).notNull(),
@@ -130,7 +132,13 @@ export const services = pgTable("services", {
   outrosCustos: integer("outros_custos").default(0).notNull(),
   observacaoCustos: text("observacao_custos"),
   // Dados adicionais de voucher
+  hasReturn: boolean("has_return").default(false).notNull(),
   returnDateTime: timestamp("return_date_time"),
+  returnOrigin: text("return_origin"),
+  returnDestination: text("return_destination"),
+  returnFlight: text("return_flight"),
+  returnDriverId: integer("return_driver_id").references(() => drivers.id),
+  returnVehicleId: integer("return_vehicle_id").references(() => vehicles.id),
   guide: text("guide"),
 });
 
@@ -315,7 +323,15 @@ export const insertServiceSchema = createInsertSchema(services)
   .omit({ id: true, createdAt: true })
   .extend({
     dateTime: z.coerce.date(),
+    parentServiceId: z.coerce.number().int().optional(),
+    isReturn: z.coerce.boolean().optional(),
+    hasReturn: z.coerce.boolean().optional(),
     returnDateTime: z.coerce.date().optional(),
+    returnOrigin: z.string().optional(),
+    returnDestination: z.string().optional(),
+    returnFlight: z.string().optional(),
+    returnDriverId: z.coerce.number().int().optional(),
+    returnVehicleId: z.coerce.number().int().optional(),
     guide: z.string().optional(),
     passengers: z.coerce.number().int().min(0).optional(),
     bags: z.coerce.number().int().min(0).optional(),

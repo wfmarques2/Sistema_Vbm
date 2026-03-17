@@ -2,11 +2,11 @@ import { Layout } from "@/components/layout";
 import { useServices } from "@/hooks/use-services";
 import { format, isSameDay, isSameMonth, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Clock, MapPin, ChevronLeft as BackIcon, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, MapPin, ChevronLeft as BackIcon, X, CircleAlert } from "lucide-react";
 import { SiWaze, SiGooglemaps, SiWhatsapp } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -34,11 +34,28 @@ export default function AgendaPage() {
   const gridEnd = endOfWeek(monthEnd);
   const gridDays = eachDayOfInterval({ start: gridStart, end: gridEnd });
 
-  const todaysServices = (services || [])
+  const agendaServices = useMemo(() => {
+    const base = services || [];
+    return base.map((service: any) => ({
+      key: `service-${service.id}`,
+      serviceId: service.id as number,
+      kind: service.isReturn ? ("return" as const) : ("outbound" as const),
+      dateTime: service.dateTime,
+      origin: service.origin,
+      destination: service.destination,
+      driverName: service.driver?.name || "Não atribuído",
+      type: service.type,
+      clientName: service.clientName,
+      status: service.status,
+      clientPhone: service.clientPhone,
+    }));
+  }, [services]);
+
+  const todaysServices = agendaServices
     .filter(s => isSameDay(new Date(s.dateTime), selectedDate))
     .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
-  const [openServiceId, setOpenServiceId] = useState<number | null>(null);
+  const [openServiceId, setOpenServiceId] = useState<string | null>(null);
   const updateMutation = useUpdateService();
   const [savingCosts, setSavingCosts] = useState(false);
   const [costs, setCosts] = useState<any>({
@@ -75,6 +92,37 @@ export default function AgendaPage() {
     if (!digits) return null;
     const withCountry = digits.startsWith("55") ? digits : `55${digits}`;
     return `https://wa.me/${withCountry}`;
+  }
+
+  function paymentMethodLabel(method?: string | null): string {
+    const m = String(method || "").toLowerCase();
+    return m === "pix" ? "PIX" :
+      m === "cash" ? "Dinheiro" :
+      m === "credit_card" ? "Cartão crédito" :
+      m === "debit_card" ? "Cartão débito" :
+      m === "saldo" ? "Saldo" :
+      m ? m : "-";
+  }
+
+  function wazeWebUrl(address: string): string {
+    return `https://waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`;
+  }
+
+  function openWaze(address: string) {
+    const appUrl = `waze://?q=${encodeURIComponent(address)}&navigate=yes`;
+    const webUrl = wazeWebUrl(address);
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (!isMobile) {
+      window.open(webUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    const startedAt = Date.now();
+    window.location.href = appUrl;
+    window.setTimeout(() => {
+      if (Date.now() - startedAt < 1700) {
+        window.open(webUrl, "_blank", "noopener,noreferrer");
+      }
+    }, 1200);
   }
 
   function initCostsFromService(s: any | undefined) {
@@ -172,7 +220,7 @@ export default function AgendaPage() {
                 {['D','S','T','Q','Q','S','S'].map(d => <div key={d} className="text-muted-foreground py-2">{d}</div>)}
                 {gridDays.map((day) => {
                   const isSelected = isSameDay(day, selectedDate);
-                  const hasEvents = (services || []).some(s => isSameDay(new Date(s.dateTime), day));
+                  const hasEvents = agendaServices.some(s => isSameDay(new Date(s.dateTime), day));
                   const inMonth = isSameMonth(day, monthStart);
                   
                   return (
@@ -218,9 +266,9 @@ export default function AgendaPage() {
             ) : (
               todaysServices.map((service) => (
                 <div 
-                  key={service.id} 
+                  key={service.key}
                   className="bg-card p-4 rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow flex gap-4 cursor-pointer"
-                  onClick={() => setOpenServiceId(service.id)}
+                  onClick={() => setOpenServiceId(service.key)}
                 >
                   <div className="flex flex-col items-center justify-center w-16 bg-secondary rounded-lg">
                     <span className="text-sm font-bold text-primary">{format(new Date(service.dateTime), 'HH:mm', { locale: ptBR })}</span>
@@ -230,16 +278,20 @@ export default function AgendaPage() {
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="font-semibold text-primary">{service.clientName}</h4>
-                        <p className="text-xs text-muted-foreground">{typeLabel(service.type)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {typeLabel(service.type)}{service.kind === "return" ? " • Retorno" : ""}
+                        </p>
                       </div>
-                      <div className={`px-2 py-1 rounded text-xs font-medium 
-                        ${service.status === 'finished' ? 'bg-green-100 text-green-700' : 
-                          service.status === 'driving_pickup' ? 'bg-yellow-100 text-yellow-700' :
-                          service.status === 'pickup_location' ? 'bg-orange-100 text-orange-700' :
-                          service.status === 'driving_destination' || String(service.status) === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                          'bg-purple-100 text-purple-700'}`
-                      }>
-                        {statusLabel(service.status)}
+                      <div className={`px-2 py-1 rounded text-xs font-medium ${
+                        service.kind === "return"
+                          ? "bg-cyan-100 text-cyan-700"
+                          : service.status === 'finished' ? 'bg-green-100 text-green-700' :
+                            service.status === 'driving_pickup' ? 'bg-yellow-100 text-yellow-700' :
+                            service.status === 'pickup_location' ? 'bg-orange-100 text-orange-700' :
+                            service.status === 'driving_destination' || String(service.status) === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                            'bg-purple-100 text-purple-700'
+                      }`}>
+                        {service.kind === "return" ? "Retorno" : statusLabel(service.status)}
                       </div>
                     </div>
 
@@ -250,7 +302,7 @@ export default function AgendaPage() {
                       </div>
                       <div className="flex items-center text-muted-foreground">
                         <span className="font-medium mr-1">Motorista:</span>
-                        {service.driver?.name || "Não atribuído"}
+                        {service.driverName || "Não atribuído"}
                       </div>
                     </div>
                   </div>
@@ -267,12 +319,14 @@ export default function AgendaPage() {
           if (!v) setOpenServiceId(null);
         }}
       >
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto bg-[#121212] text-white border border-[#2a2a2a]">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto bg-background text-foreground border border-border">
           {(() => {
-            const s = todaysServices.find(x => x.id === openServiceId);
+            const selectedItem = todaysServices.find(x => x.key === openServiceId);
+            const s = (services || []).find((x: any) => x.id === selectedItem?.serviceId);
+            const isReturnItem = selectedItem?.kind === "return";
             if (!s) return <div className="text-muted-foreground">Selecione um serviço</div>;
             // Inicializa os custos quando o serviço abrir
-            if (savingCosts === false && openServiceId === s.id && costs?.__initFrom !== s.id) {
+            if (!isReturnItem && savingCosts === false && openServiceId === `service-${s.id}` && costs?.__initFrom !== s.id) {
               initCostsFromService(s);
               // marcação simples no objeto para evitar reinit loops
               setCosts((prev: any) => ({ ...prev, __initFrom: s.id }));
@@ -298,44 +352,87 @@ export default function AgendaPage() {
               s.status === "pickup_location" ? "bg-orange-100 text-orange-700" :
               s.status === "driving_destination" || String(s.status) === "in_progress" ? "bg-blue-100 text-blue-700" :
               "bg-purple-100 text-purple-700";
-            const originUrlWaze = `https://waze.com/ul?q=${encodeURIComponent(s.origin)}&navigate=yes`;
-            const originUrlGmaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.origin)}`;
-            const destUrlWaze = `https://waze.com/ul?q=${encodeURIComponent(s.destination)}&navigate=yes`;
-            const destUrlGmaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.destination)}`;
+            const tripOrigin = isReturnItem ? (selectedItem?.origin || s.returnOrigin || s.destination) : s.origin;
+            const tripDestination = isReturnItem ? (selectedItem?.destination || s.returnDestination || s.origin) : s.destination;
+            const tripDateTime = isReturnItem ? (selectedItem?.dateTime || s.returnDateTime || s.dateTime) : s.dateTime;
+            const tripDriver = isReturnItem ? (selectedItem?.driverName || s.driver?.name || "Não atribuído") : (s.driver?.name || "Não atribuído");
+            const originUrlGmaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tripOrigin)}`;
+            const destUrlGmaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tripDestination)}`;
             const whatsappUrl = buildWhatsappUrl(s.clientPhone);
             const serviceId = s.id;
-            const vehicleId = s.vehicleId;
+            const vehicleId = isReturnItem ? (s.returnVehicleId || s.vehicleId) : s.vehicleId;
+            const paxTotal = Number(s.passengers || 0) > 0
+              ? Number(s.passengers || 0)
+              : Number(s.paxAdt || 0) +
+                Number(s.paxChd || 0) +
+                Number(s.paxInf || 0) +
+                Number(s.paxSen || 0) +
+                Number(s.paxFree || 0);
+            const bagsCount = Number(s.bags || 0);
+            const serviceObservation = String(s.notes || "").trim();
+            const totalChargedCents = Number(s.valorCobrado || 0) > 0
+              ? Number(s.valorCobrado || 0)
+              : Math.round(Number(s.value || 0) * 100);
+            const paidPartialCents = Number(s.valorPagoParcial || 0);
+            const payDriverAmountCents = Math.max(0, totalChargedCents - paidPartialCents);
+            const showPayDriverReminder =
+              !isReturnItem &&
+              String(s.statusPagamento || "") === "partial" &&
+              String(s.restanteMetodo || "") === "pay_driver" &&
+              payDriverAmountCents > 0;
             return (
               <>
                 <div className="flex items-center justify-between mb-2">
-                  <button className="inline-flex items-center gap-1 text-[#d4af37]" onClick={() => setOpenServiceId(null)}>
+                  <button className="inline-flex items-center gap-1 text-primary" onClick={() => setOpenServiceId(null)}>
                     <BackIcon className="w-4 h-4" />
-                    <span>Serviço #{String(s.id).padStart(6, "0")}</span>
+                    <span>Serviço #{String(s.id).padStart(6, "0")}{isReturnItem ? " • Retorno" : ""}</span>
                   </button>
                 </div>
-                <div className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4 shadow-sm">
+                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
                   <div className="space-y-2 text-sm">
-                    <div><span className="font-semibold text-[#d4af37]">Cliente:</span> {s.clientName}</div>
-                    <div><span className="font-semibold text-[#d4af37]">Motorista:</span> {s.driver?.name || "Não atribuído"}</div>
-                    <div><span className="font-semibold text-[#d4af37]">Data/Hora:</span> {format(new Date(s.dateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</div>
-                    <div className="flex items-start gap-2">
-                      <MapPin className="w-4 h-4 text-[#d4af37] mt-0.5" />
+                    <div><span className="font-semibold text-primary">Cliente:</span> {s.clientName}</div>
+                    <div><span className="font-semibold text-primary">Motorista:</span> {tripDriver}</div>
+                    <div><span className="font-semibold text-primary">Data/Hora:</span> {format(new Date(tripDateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div><span className="font-semibold text-primary">Qtde pax:</span> {paxTotal}</div>
+                      <div><span className="font-semibold text-primary">Malas:</span> {bagsCount}</div>
+                    </div>
+                    {serviceObservation && (
                       <div>
-                        <div className="text-xs text-white/60">Origem</div>
-                        <div>{s.origin}</div>
+                        <span className="font-semibold text-primary">Observação:</span>{" "}
+                        <span>{serviceObservation}</span>
+                      </div>
+                    )}
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-primary mt-0.5" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Origem</div>
+                        <div>{tripOrigin}</div>
                       </div>
                     </div>
                     <div className="flex items-start gap-2">
                       <MapPin className="w-4 h-4 text-blue-400 mt-0.5" />
                       <div className="flex-1">
-                        <div className="text-xs text-white/60">Destino</div>
+                        <div className="text-xs text-muted-foreground">Destino</div>
                         <div className="flex items-center justify-between gap-2">
-                          <span>{s.destination}</span>
+                          <span>{tripDestination}</span>
                           <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusClass}`}>{statusLabel(s.status)}</span>
                         </div>
                       </div>
                     </div>
                   </div>
+                  {showPayDriverReminder && (
+                    <div className="mt-3 rounded-lg border border-amber-300/70 bg-amber-100/80 px-3 py-2 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                      <div className="flex items-start gap-2 text-sm">
+                        <CircleAlert className="w-4 h-4 mt-0.5" />
+                        <div>
+                          <span className="font-semibold">Cobrar do Passageiro:</span>{" "}
+                          {(payDriverAmountCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}{" "}
+                          no {paymentMethodLabel(s.paymentMethod)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="mt-3">
                     <a
                       href={whatsappUrl || "#"}
@@ -351,7 +448,7 @@ export default function AgendaPage() {
                           });
                         }
                       }}
-                      className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md w-full ${whatsappUrl ? "bg-[#25D366] text-black hover:bg-[#1fc15a]" : "bg-[#2a2a2a] text-white/60 cursor-not-allowed"}`}
+                      className={`inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md w-full ${whatsappUrl ? "bg-[#25D366] text-black hover:bg-[#1fc15a]" : "bg-muted text-muted-foreground cursor-not-allowed"}`}
                     >
                       <SiWhatsapp className="w-5 h-5" />
                       <span>Falar com cliente no WhatsApp</span>
@@ -366,7 +463,7 @@ export default function AgendaPage() {
                         if (!ok) return;
                         await updateMutation.mutateAsync({ id: serviceId, status: nextStatus as any });
                       }}
-                      className="bg-[#d4af37] text-black hover:bg-[#c39a2f]"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                       style={{ width: "100%" }}
                     >
                       {nextStatus ? `Avançar: ${statusLabel(nextStatus)}` : "Sem próximo status"}
@@ -398,46 +495,47 @@ export default function AgendaPage() {
                         setOpenServiceId(null);
                       }}
                       variant="secondary"
-                      className="bg-[#2a2a2a] text-white hover:bg-[#333]"
+                      className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
                       style={{ width: "100%" }}
                     >
                       Concluir viagem
                     </Button>
                   </div>
-                  <div className="mt-2 text-sm text-white/80">
-                    Status: {driverActionStatus(String(s.status), nextStatus)}
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    <div>{`Status: ${driverActionStatus(String(s.status), nextStatus)}`}</div>
+                    {isReturnItem && <div>Item de retorno vinculado ao mesmo serviço.</div>}
                   </div>
                 </div>
                 <div className="mt-4">
-                  <div className="text-[#d4af37] font-semibold mb-2">Navegação</div>
+                  <div className="text-primary font-semibold mb-2">Navegação</div>
                   <div className="space-y-3">
-                    <div className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
+                    <div className="rounded-xl border border-border bg-card p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <MapPin className="w-4 h-4 text-[#d4af37]" />
+                        <MapPin className="w-4 h-4 text-primary" />
                         <div className="font-medium">Dirigir até o embarque</div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <a href={originUrlWaze} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-[#2a2a2a] hover:bg-[#333] w-full">
+                        <button type="button" onClick={() => openWaze(tripOrigin)} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 w-full">
                           <SiWaze className="w-5 h-5 text-[#86d1ff]" />
                           <span>Waze</span>
-                        </a>
-                        <a href={originUrlGmaps} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-[#2a2a2a] hover:bg-[#333] w-full">
+                        </button>
+                        <a href={originUrlGmaps} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 w-full">
                           <SiGooglemaps className="w-5 h-5 text-[#47b66e]" />
                           <span>Google Maps</span>
                         </a>
                       </div>
                     </div>
-                    <div className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
+                    <div className="rounded-xl border border-border bg-card p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <MapPin className="w-4 h-4 text-blue-400" />
                         <div className="font-medium">Dirigir até o destino</div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <a href={destUrlWaze} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-[#2a2a2a] hover:bg-[#333] w-full">
+                        <button type="button" onClick={() => openWaze(tripDestination)} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 w-full">
                           <SiWaze className="w-5 h-5 text-[#86d1ff]" />
                           <span>Waze</span>
-                        </a>
-                        <a href={destUrlGmaps} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-[#2a2a2a] hover:bg-[#333] w-full">
+                        </button>
+                        <a href={destUrlGmaps} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 w-full">
                           <SiGooglemaps className="w-5 h-5 text-[#47b66e]" />
                           <span>Google Maps</span>
                         </a>
@@ -445,66 +543,67 @@ export default function AgendaPage() {
                     </div>
                   </div>
                 </div>
+                {!isReturnItem && (
                 <div className="mt-4">
                   <Accordion type="single" collapsible defaultValue="">
-                    <AccordionItem value="expenses" className="border border-[#2a2a2a] rounded-xl bg-[#1a1a1a]">
-                      <AccordionTrigger className="px-4 py-3 text-[#d4af37]">
+                    <AccordionItem value="expenses" className="border border-border rounded-xl bg-card">
+                      <AccordionTrigger className="px-4 py-3 text-primary">
                         Despesas da viagem
                       </AccordionTrigger>
                       <AccordionContent className="px-4 pb-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                           <div>
-                            <label className="block mb-1 text-white/70">KM Real (ex.: 25,5)</label>
-                            <input className="w-full px-3 py-2 rounded bg-[#121212] border border-[#2a2a2a]"
+                            <label className="block mb-1 text-muted-foreground">KM Real (ex.: 25,5)</label>
+                            <input className="w-full px-3 py-2 rounded bg-background border border-border"
                               value={costs.kmReal}
                               onChange={(e) => setCosts((c: any) => ({ ...c, kmReal: e.target.value }))}
                               placeholder="Ex.: 23,7"
                             />
                           </div>
                           <div>
-                            <label className="block mb-1 text-white/70">Combustível (R$)</label>
-                            <input className="w-full px-3 py-2 rounded bg-[#121212] border border-[#2a2a2a]"
+                            <label className="block mb-1 text-muted-foreground">Combustível (R$)</label>
+                            <input className="w-full px-3 py-2 rounded bg-background border border-border"
                               value={costs.combustivel}
                               onChange={(e) => setCosts((c: any) => ({ ...c, combustivel: formatInputBRL(e.target.value) }))}
                             />
                           </div>
                           <div>
-                            <label className="block mb-1 text-white/70">Pedágio (R$)</label>
-                            <input className="w-full px-3 py-2 rounded bg-[#121212] border border-[#2a2a2a]"
+                            <label className="block mb-1 text-muted-foreground">Pedágio (R$)</label>
+                            <input className="w-full px-3 py-2 rounded bg-background border border-border"
                               value={costs.pedagio}
                               onChange={(e) => setCosts((c: any) => ({ ...c, pedagio: formatInputBRL(e.target.value) }))}
                             />
                           </div>
                           <div>
-                            <label className="block mb-1 text-white/70">Estacionamento (R$)</label>
-                            <input className="w-full px-3 py-2 rounded bg-[#121212] border border-[#2a2a2a]"
+                            <label className="block mb-1 text-muted-foreground">Estacionamento (R$)</label>
+                            <input className="w-full px-3 py-2 rounded bg-background border border-border"
                               value={costs.estacionamento}
                               onChange={(e) => setCosts((c: any) => ({ ...c, estacionamento: formatInputBRL(e.target.value) }))}
                             />
                           </div>
                           <div>
-                            <label className="block mb-1 text-white/70">Alimentação (R$)</label>
-                            <input className="w-full px-3 py-2 rounded bg-[#121212] border border-[#2a2a2a]"
+                            <label className="block mb-1 text-muted-foreground">Alimentação (R$)</label>
+                            <input className="w-full px-3 py-2 rounded bg-background border border-border"
                               value={costs.alimentacao}
                               onChange={(e) => setCosts((c: any) => ({ ...c, alimentacao: formatInputBRL(e.target.value) }))}
                             />
                           </div>
                           <div>
-                            <label className="block mb-1 text-white/70">Outros (R$)</label>
-                            <input className="w-full px-3 py-2 rounded bg-[#121212] border border-[#2a2a2a]"
+                            <label className="block mb-1 text-muted-foreground">Outros (R$)</label>
+                            <input className="w-full px-3 py-2 rounded bg-background border border-border"
                               value={costs.outrosCustos}
                               onChange={(e) => setCosts((c: any) => ({ ...c, outrosCustos: formatInputBRL(e.target.value) }))}
                             />
                           </div>
                           <div className="md:col-span-2">
-                            <label className="block mb-1 text-white/70">Observação</label>
-                            <textarea className="w-full px-3 py-2 rounded bg-[#121212] border border-[#2a2a2a]"
+                            <label className="block mb-1 text-muted-foreground">Observação</label>
+                            <textarea className="w-full px-3 py-2 rounded bg-background border border-border"
                               value={costs.observacaoCustos}
                               onChange={(e) => setCosts((c: any) => ({ ...c, observacaoCustos: e.target.value }))}
                             />
                           </div>
                           <div className="md:col-span-2 flex justify-end">
-                            <Button onClick={() => saveCosts(serviceId)} disabled={savingCosts} className="bg-[#d4af37] text-black hover:bg-[#c39a2f]">
+                            <Button onClick={() => saveCosts(serviceId)} disabled={savingCosts} className="bg-primary text-primary-foreground hover:bg-primary/90">
                               {savingCosts ? "Salvando..." : "Salvar despesas"}
                             </Button>
                           </div>
@@ -513,7 +612,8 @@ export default function AgendaPage() {
                     </AccordionItem>
                   </Accordion>
                 </div>
-                {canCancel && (
+                )}
+                {!isReturnItem && canCancel && (
                   <div className="mt-4">
                     <Button
                       variant="destructive"

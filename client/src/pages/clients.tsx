@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Phone, Mail, Users, FileText, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Mail, Users, FileText, Download, MoreHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,6 +27,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
@@ -285,22 +291,28 @@ export default function ClientsPage() {
                   </TableCell>
                   <TableCell>{client.completedTrips ?? 0}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setHistoryClientId(client.id)}
-                        title="Histórico de corridas"
-                      >
-                        <FileText className="w-4 h-4 text-primary" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(client)} title="Editar e Gerenciar Dependentes">
-                        <Pencil className="w-4 h-4 text-blue-600" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(client.id)}>
-                        <Trash2 className="w-4 h-4 text-red-600" />
-                      </Button>
-                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-1">
+                          <MoreHorizontal className="w-4 h-4" />
+                          Ações
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setHistoryClientId(client.id)}>
+                          <FileText className="w-4 h-4 text-primary" />
+                          Histórico de corridas
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(client)}>
+                          <Pencil className="w-4 h-4 text-blue-600" />
+                          Editar e Gerenciar Dependentes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDelete(client.id)}>
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))

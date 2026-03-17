@@ -2,7 +2,7 @@ import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useFinancialReport, useListUnifiedExpenses } from "@/hooks/use-financial";
 import { useServices } from "@/hooks/use-services";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -59,6 +59,62 @@ export default function FinanceReportsPage() {
     end: end || undefined,
     sortOrder: "desc",
   });
+  const directServiceCostCents = (s: any) =>
+    Number(s.combustivel || 0) +
+    Number(s.pedagio || 0) +
+    Number(s.estacionamento || 0) +
+    Number(s.alimentacao || 0) +
+    Number(s.outrosCustos || 0);
+  const directServiceRevenueCents = (s: any) => {
+    const charged = Number(s.valorCobrado || 0);
+    if (charged > 0) return charged;
+    const parsed = Math.round(Number(s.value || 0) * 100);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const consolidatedServices = useMemo(() => {
+    const rows = services || [];
+    const parents = rows.filter((s: any) => !s.isReturn);
+    const groupedReturns = new Map<number, any[]>();
+    rows
+      .filter((s: any) => s.isReturn && s.parentServiceId)
+      .forEach((s: any) => {
+        const key = Number(s.parentServiceId);
+        const arr = groupedReturns.get(key) || [];
+        arr.push(s);
+        groupedReturns.set(key, arr);
+      });
+    const consolidated = parents.map((p: any) => {
+      const returns = groupedReturns.get(Number(p.id)) || [];
+      const ownCost = directServiceCostCents(p);
+      const returnCost = returns.reduce((sum, r) => sum + directServiceCostCents(r), 0);
+      return {
+        ...p,
+        receitaConsolidadaCentavos: directServiceRevenueCents(p),
+        custosConsolidadosCentavos: ownCost + returnCost,
+      };
+    });
+    const orphanReturns = rows.filter(
+      (s: any) =>
+        s.isReturn &&
+        (!s.parentServiceId || !parents.some((p: any) => Number(p.id) === Number(s.parentServiceId)))
+    );
+    for (const r of orphanReturns) {
+      consolidated.push({
+        ...r,
+        receitaConsolidadaCentavos: 0,
+        custosConsolidadosCentavos: directServiceCostCents(r),
+      });
+    }
+    return consolidated;
+  }, [services]);
+  const consolidatedServiceRevenueCents = consolidatedServices.reduce(
+    (sum, s: any) => sum + Number(s.receitaConsolidadaCentavos || 0),
+    0
+  );
+  const consolidatedServiceCostCents = consolidatedServices.reduce(
+    (sum, s: any) => sum + Number(s.custosConsolidadosCentavos || 0),
+    0
+  );
 
   const exportPdf = async () => {
     const { jsPDF } = await import("jspdf");
@@ -94,12 +150,12 @@ export default function FinanceReportsPage() {
     let y = margin;
     let pageNo = 1;
     const fmt = (v: number) => `R$${(v / 100).toFixed(2)}`;
-    const receitaTotal = Number(report?.totalValorCobradoCentavos || 0);
-    const despesasTotal = Number(report?.totalCustosCentavos || 0) + Number(report?.despesasExtrasCentavos || 0);
-    const lucroTotal = Number(report?.lucroBrutoCentavos || 0);
-    const receitaServicos = Number(report?.totalReceitasServicosCentavos || 0);
+    const receitaServicos = consolidatedServiceRevenueCents;
     const receitaExtras = Number(report?.totalReceitasExtrasCentavos || 0);
     const despExtras = Number(report?.despesasExtrasCentavos || 0);
+    const receitaTotal = receitaServicos + receitaExtras;
+    const despesasTotal = consolidatedServiceCostCents + despExtras;
+    const lucroTotal = receitaTotal - despesasTotal;
     const col = (r: number, g: number, b: number) => pdf.setTextColor(r, g, b);
     const fill = (r: number, g: number, b: number) => pdf.setFillColor(r, g, b);
     const line = (r: number, g: number, b: number) => pdf.setDrawColor(r, g, b);
@@ -194,13 +250,13 @@ export default function FinanceReportsPage() {
       }
     };
     drawHeaderRow();
-    const rows = (services || []).map((s: any) => ({
+    const rows = consolidatedServices.map((s: any) => ({
       data: new Date(s.dateTime).toLocaleDateString("pt-BR"),
       cliente: String(s.clientName || "-"),
       origem: String(s.origin || "-"),
       destino: String(s.destination || "-"),
       motorista: String(s.driver?.name || "-"),
-      valor: fmt(Number(s.valorCobrado || 0)),
+      valor: fmt(Number(s.receitaConsolidadaCentavos || 0)),
       status: (() => {
         const st = String(s.statusPagamento || "-");
         if (st === "paid") return "Pago";
@@ -270,16 +326,22 @@ export default function FinanceReportsPage() {
       { header: "Campo", key: "campo", width: 28 },
       { header: "Valor", key: "valor", width: 22 },
     ];
+    const receitaServicos = consolidatedServiceRevenueCents;
+    const despExtras = Number(report?.despesasExtrasCentavos || 0);
+    const receitaExtras = Number(report?.totalReceitasExtrasCentavos || 0);
+    const receitaTotal = receitaServicos + receitaExtras;
+    const despesasTotal = consolidatedServiceCostCents + despExtras;
+    const lucroBruto = receitaTotal - despesasTotal;
     resumo.addRow({ campo: "Período", valor: `${start} a ${end}` });
-    resumo.addRow({ campo: "Receita total", valor: Number(report?.totalValorCobradoCentavos || 0) / 100 });
+    resumo.addRow({ campo: "Receita total", valor: receitaTotal / 100 });
     resumo.addRow({
       campo: "Despesas",
-      valor: (Number(report?.totalCustosCentavos || 0) + Number(report?.despesasExtrasCentavos || 0)) / 100,
+      valor: despesasTotal / 100,
     });
-    resumo.addRow({ campo: "Lucro bruto", valor: Number(report?.lucroBrutoCentavos || 0) / 100 });
-    resumo.addRow({ campo: "Receitas de serviços", valor: Number(report?.totalReceitasServicosCentavos || 0) / 100 });
-    resumo.addRow({ campo: "Receitas extras", valor: Number(report?.totalReceitasExtrasCentavos || 0) / 100 });
-    resumo.addRow({ campo: "Despesas extras", valor: Number(report?.despesasExtrasCentavos || 0) / 100 });
+    resumo.addRow({ campo: "Lucro bruto", valor: lucroBruto / 100 });
+    resumo.addRow({ campo: "Receitas de serviços", valor: receitaServicos / 100 });
+    resumo.addRow({ campo: "Receitas extras", valor: receitaExtras / 100 });
+    resumo.addRow({ campo: "Despesas extras", valor: despExtras / 100 });
     resumo.addRow({
       campo: "Custo médio por km",
       valor: report?.custoMedioPorKmCentavos != null ? report.custoMedioPorKmCentavos / 100 : null,
@@ -303,14 +365,9 @@ export default function FinanceReportsPage() {
       { header: "Método", key: "metodo", width: 16 },
       { header: "Status", key: "status", width: 18 },
     ];
-    (services || []).forEach((s: any) => {
-      const custoTotal =
-        Number(s.combustivel || 0) +
-        Number(s.pedagio || 0) +
-        Number(s.estacionamento || 0) +
-        Number(s.alimentacao || 0) +
-        Number(s.outrosCustos || 0);
-      const valorCobrado = Number(s.valorCobrado || 0);
+    consolidatedServices.forEach((s: any) => {
+      const custoTotal = Number(s.custosConsolidadosCentavos || 0);
+      const valorCobrado = Number(s.receitaConsolidadaCentavos || 0);
       const lucroBruto = valorCobrado - custoTotal;
       servicosWs.addRow({
         dataHora: new Date(s.dateTime).toLocaleString("pt-BR"),
@@ -458,19 +515,19 @@ export default function FinanceReportsPage() {
               <div>
                 <div className="text-sm text-muted-foreground">Total Cobrado</div>
                 <div className="text-2xl font-semibold">
-                  R${(report.totalValorCobradoCentavos / 100).toFixed(2)}
+                  R${((consolidatedServiceRevenueCents + Number(report.totalReceitasExtrasCentavos || 0)) / 100).toFixed(2)}
                 </div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Total de Custos</div>
                 <div className="text-2xl font-semibold">
-                  R${(report.totalCustosCentavos / 100).toFixed(2)}
+                  R${((consolidatedServiceCostCents + Number(report.despesasExtrasCentavos || 0)) / 100).toFixed(2)}
                 </div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Lucro Bruto</div>
-                <div className={`text-2xl font-semibold ${report.lucroBrutoCentavos < 0 ? "text-red-600" : "text-green-600"}`}>
-                  R${(report.lucroBrutoCentavos / 100).toFixed(2)}
+                <div className={`text-2xl font-semibold ${(consolidatedServiceRevenueCents + Number(report.totalReceitasExtrasCentavos || 0) - consolidatedServiceCostCents - Number(report.despesasExtrasCentavos || 0)) < 0 ? "text-red-600" : "text-green-600"}`}>
+                  R${((consolidatedServiceRevenueCents + Number(report.totalReceitasExtrasCentavos || 0) - consolidatedServiceCostCents - Number(report.despesasExtrasCentavos || 0)) / 100).toFixed(2)}
                 </div>
               </div>
             </div>
@@ -479,7 +536,7 @@ export default function FinanceReportsPage() {
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <div className="text-sm text-muted-foreground">Receitas de Serviços</div>
-                <div className="text-xl">R${((report.totalReceitasServicosCentavos || 0) / 100).toFixed(2)}</div>
+                <div className="text-xl">R${(consolidatedServiceRevenueCents / 100).toFixed(2)}</div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Receitas Extras</div>
@@ -491,11 +548,11 @@ export default function FinanceReportsPage() {
               </div>
             </div>
           )}
-          {services && (
+          {consolidatedServices.length > 0 && (
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="border rounded-md p-3">
                 <div className="text-sm text-muted-foreground mb-2">Por método de pagamento</div>
-                {(Object.entries(groupByPaymentMethod(services)) as [string, number][]).map(([m, total]) => (
+                {(Object.entries(groupByPaymentMethod(consolidatedServices)) as [string, number][]).map(([m, total]) => (
                   <div key={m} className="flex justify-between">
                     <div>{paymentLabel(m)}</div>
                     <div className="font-semibold">R${(total / 100).toFixed(2)}</div>
@@ -504,7 +561,7 @@ export default function FinanceReportsPage() {
               </div>
               <div className="border rounded-md p-3">
                 <div className="text-sm text-muted-foreground mb-2">Por status de pagamento</div>
-                {(Object.entries(groupByPaymentStatus(services)) as [string, number][]).map(([s, total]) => (
+                {(Object.entries(groupByPaymentStatus(consolidatedServices)) as [string, number][]).map(([s, total]) => (
                   <div key={s} className="flex justify-between">
                     <div>{paymentStatusLabel(s)}</div>
                     <div className="font-semibold">R${(total / 100).toFixed(2)}</div>
@@ -544,7 +601,7 @@ export default function FinanceReportsPage() {
           {!enabled && <div className="text-muted-foreground">Informe início e fim para listar.</div>}
           {isLoadingServices && <div className="text-muted-foreground">Carregando serviços...</div>}
           {isErrorServices && <div className="text-destructive">Erro ao carregar serviços.</div>}
-          {services && (
+          {consolidatedServices.length > 0 && (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -558,9 +615,9 @@ export default function FinanceReportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {services.map((s) => {
-                  const custoTotal = Number(s.combustivel || 0) + Number(s.pedagio || 0) + Number(s.estacionamento || 0) + Number(s.alimentacao || 0) + Number(s.outrosCustos || 0);
-                  const valorCobrado = Number(s.valorCobrado || 0);
+                {consolidatedServices.map((s: any) => {
+                  const custoTotal = Number(s.custosConsolidadosCentavos || 0);
+                  const valorCobrado = Number(s.receitaConsolidadaCentavos || 0);
                   const lucroBruto = valorCobrado - custoTotal;
                   return (
                     <TableRow key={s.id}>
@@ -655,7 +712,7 @@ function paymentStatusLabel(s: string) {
 function groupByPaymentMethod(services: any[]) {
   return services.reduce((acc, s) => {
     const m = s.paymentMethod || "-";
-    const v = Number(s.valorCobrado || 0);
+    const v = Number(s.receitaConsolidadaCentavos ?? s.valorCobrado ?? 0);
     acc[m] = (acc[m] || 0) + v;
     return acc;
   }, {} as Record<string, number>);
@@ -664,7 +721,7 @@ function groupByPaymentMethod(services: any[]) {
 function groupByPaymentStatus(services: any[]) {
   return services.reduce((acc, s) => {
     const st = s.statusPagamento || "pending";
-    const v = Number(s.valorCobrado || 0);
+    const v = Number(s.receitaConsolidadaCentavos ?? s.valorCobrado ?? 0);
     acc[st] = (acc[st] || 0) + v;
     return acc;
   }, {} as Record<string, number>);

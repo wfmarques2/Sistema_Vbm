@@ -814,6 +814,8 @@ export async function registerRoutes(
       driverId?: number;
       vehicleId?: number;
       status?: string;
+      parentServiceId?: number;
+      isReturn?: boolean;
       start?: string;
       end?: string;
       statusPagamento?: string;
@@ -825,6 +827,8 @@ export async function registerRoutes(
       driverId: req.query.driverId ? Number(req.query.driverId) : undefined,
       vehicleId: req.query.vehicleId ? Number(req.query.vehicleId) : undefined,
       status: req.query.status as string,
+      parentServiceId: req.query.parentServiceId ? Number(req.query.parentServiceId) : undefined,
+      isReturn: req.query.isReturn != null ? String(req.query.isReturn) === "true" : undefined,
       start: req.query.start as string,
       end: req.query.end as string,
       statusPagamento: req.query.statusPagamento as string,
@@ -871,6 +875,8 @@ export async function registerRoutes(
       const conditions: any[] = [];
       if (filters.driverId) conditions.push(eq(services.driverId, filters.driverId));
       if (filters.vehicleId) conditions.push(eq(services.vehicleId, filters.vehicleId));
+      if (typeof filters.parentServiceId === "number") conditions.push(eq(services.parentServiceId, filters.parentServiceId));
+      if (typeof filters.isReturn === "boolean") conditions.push(eq(services.isReturn, filters.isReturn));
       if (filters.status) {
         const allowed = ["scheduled","driving_pickup","pickup_location","driving_destination","finished","canceled"] as const;
         if (allowed.includes(filters.status as typeof allowed[number])) {

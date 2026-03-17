@@ -10,6 +10,8 @@ import executivoIconUrl from "@assets/executivo.png?url";
 import paxIconUrl from "@assets/pax_icon.png?url";
 import malaIconUrl from "@assets/mala_icon.png?url";
 import { ptBR, es } from "date-fns/locale";
+import { useDrivers } from "@/hooks/use-drivers";
+import { useVehicles } from "@/hooks/use-vehicles";
 
 const translations = {
   pt: {
@@ -93,9 +95,12 @@ export default function ServiceVoucherPage() {
   const [, params] = useRoute("/services/:id/voucher");
   const id = Number(params?.id || 0);
   const [service, setService] = useState<Service | null>(null);
+  const [returnService, setReturnService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lang, setLang] = useState<"pt" | "es">("pt");
+  const { data: drivers } = useDrivers();
+  const { data: vehicles } = useVehicles();
   
   const t = translations[lang];
   const dateLocale = lang === "pt" ? ptBR : es;
@@ -121,6 +126,13 @@ export default function ServiceVoucherPage() {
         if (!res.ok) throw new Error("Falha ao carregar serviço");
         const data = await res.json();
         if (mounted) setService(data);
+        try {
+          const retRes = await fetch(`/api/services?parentServiceId=${id}&isReturn=true&limit=1`, { credentials: "include" });
+          if (retRes.ok) {
+            const rows = await retRes.json();
+            if (mounted) setReturnService(Array.isArray(rows) ? rows[0] || null : null);
+          }
+        } catch {}
       } catch (e: any) {
         if (mounted) setError(e.message || "Erro");
       } finally {
@@ -181,6 +193,18 @@ export default function ServiceVoucherPage() {
   const paxSen = qsSen ?? (service?.paxSen ?? 0);
   const paxFree = qsFree ?? (service?.paxFree ?? 0);
   const totalPax = paxAdt + paxChd + paxInf + paxSen + paxFree;
+  const hasReturn = Boolean(
+    returnService?.id ||
+    service?.hasReturn ||
+    service?.returnDateTime ||
+    service?.returnOrigin ||
+    service?.returnDestination ||
+    service?.returnFlight ||
+    service?.returnDriverId ||
+    service?.returnVehicleId
+  );
+  const returnDriver = returnService?.driver || (drivers || []).find((d: any) => Number(d.id) === Number(service?.returnDriverId));
+  const returnVehicle = returnService?.vehicle || (vehicles || []).find((v: any) => Number(v.id) === Number(service?.returnVehicleId));
 
   return (
     <Layout>
@@ -262,7 +286,7 @@ export default function ServiceVoucherPage() {
                 </div>
                 <div className="space-y-0.5">
                   <div className="text-[11px] text-neutral-600">{t.return}</div>
-                  <div className="font-medium">{service.returnDateTime ? format(new Date(service.returnDateTime), "dd/MM/yyyy HH:mm", { locale: dateLocale }) : "—"}</div>
+                  <div className="font-medium">{hasReturn ? "Sim" : "Não"}</div>
                 </div>
                 <div className="space-y-0.5">
                   <div className="text-[11px] text-neutral-600">{t.driver}</div>
@@ -291,8 +315,8 @@ export default function ServiceVoucherPage() {
             <div className="mt-3">
               <div className="w-full text-[12px] border rounded-md divide-y voucher-grid">
                 <div className="grid grid-cols-[110px_1fr]">
-                  <div className="px-2 py-1 border-r text-neutral-600 cell">{t.hour}</div>
-                  <div className="px-2 py-1 cell">{format(new Date(service.dateTime), "HH:mm", { locale: dateLocale })}</div>
+                  <div className="px-2 py-1 border-r text-neutral-600 cell">IDA</div>
+                  <div className="px-2 py-1 cell">{format(new Date(service.dateTime), "dd/MM/yyyy HH:mm", { locale: dateLocale })}</div>
                 </div>
                 <div className="grid grid-cols-[110px_1fr]">
                   <div className="px-2 py-1 border-r text-neutral-600 cell">{t.osNumber}</div>
@@ -326,6 +350,50 @@ export default function ServiceVoucherPage() {
                   <div className="px-2 py-1 border-r text-neutral-600 cell">{t.destination}</div>
                   <div className="px-2 py-1 leading-tight cell">{String(service.destination)}</div>
                 </div>
+                <div className="grid grid-cols-[110px_1fr]">
+                  <div className="px-2 py-1 border-r text-neutral-600 cell">{t.driver}</div>
+                  <div className="px-2 py-1 leading-tight cell">{service.driver?.name || "—"}</div>
+                </div>
+                <div className="grid grid-cols-[110px_1fr]">
+                  <div className="px-2 py-1 border-r text-neutral-600 cell">{t.vehicle}</div>
+                  <div className="px-2 py-1 leading-tight cell">
+                    {service.vehicle?.model || "—"}{service.vehicle?.plate ? ` (${service.vehicle.plate})` : ""}
+                  </div>
+                </div>
+                {hasReturn && (
+                  <>
+                    <div className="grid grid-cols-[110px_1fr]">
+                      <div className="px-2 py-1 border-r text-neutral-600 cell">RETORNO</div>
+                      <div className="px-2 py-1 cell">
+                        {(returnService?.dateTime || service.returnDateTime) ? format(new Date(returnService?.dateTime || service.returnDateTime), "dd/MM/yyyy HH:mm", { locale: dateLocale }) : "—"}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-[110px_1fr]">
+                      <div className="px-2 py-1 border-r text-neutral-600 cell">{t.origin}</div>
+                      <div className="px-2 py-1 leading-tight cell">
+                        {(() => {
+                          const origin = String(returnService?.origin || service.returnOrigin || "—");
+                          const flight = String(returnService?.flight || service.returnFlight || "").trim();
+                          return flight ? `${origin} - Voo: ${flight}` : origin;
+                        })()}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-[110px_1fr]">
+                      <div className="px-2 py-1 border-r text-neutral-600 cell">{t.destination}</div>
+                      <div className="px-2 py-1 leading-tight cell">{String(returnService?.destination || service.returnDestination || "—")}</div>
+                    </div>
+                    <div className="grid grid-cols-[110px_1fr]">
+                      <div className="px-2 py-1 border-r text-neutral-600 cell">{t.driver}</div>
+                      <div className="px-2 py-1 leading-tight cell">{returnDriver?.name || "—"}</div>
+                    </div>
+                    <div className="grid grid-cols-[110px_1fr]">
+                      <div className="px-2 py-1 border-r text-neutral-600 cell">{t.vehicle}</div>
+                      <div className="px-2 py-1 leading-tight cell">
+                        {returnVehicle?.model || "—"}{returnVehicle?.plate ? ` (${returnVehicle.plate})` : ""}
+                      </div>
+                    </div>
+                  </>
+                )}
                 <div className="grid grid-cols-[110px_1fr]">
                   <div className="px-2 py-1 border-r text-neutral-600 cell">T</div>
                   <div className="px-2 py-1 cell">
