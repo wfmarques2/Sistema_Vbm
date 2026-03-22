@@ -97,6 +97,17 @@ app.use((req, res, next) => {
   await pool.query(`ALTER TABLE IF EXISTS "vehicles" ADD COLUMN IF NOT EXISTS "luggage_capacity" integer DEFAULT 0;`);
   await pool.query(`ALTER TABLE IF EXISTS "services" ADD COLUMN IF NOT EXISTS "restante_metodo_driver" text;`);
   await pool.query(`ALTER TABLE IF EXISTS "services" ADD COLUMN IF NOT EXISTS "flight" text;`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "driver_push_tokens" (
+      "id" serial PRIMARY KEY,
+      "driver_id" integer NOT NULL REFERENCES "drivers"("id"),
+      "token" text NOT NULL UNIQUE,
+      "platform" text,
+      "user_agent" text,
+      "updated_at" timestamp DEFAULT now() NOT NULL,
+      "created_at" timestamp DEFAULT now() NOT NULL
+    );
+  `);
 
   // Sessions (Postgres store)
   const PgStore = connectPg(session);

@@ -41,6 +41,8 @@ export default function ServiceEditPage() {
   const [dateTimeInput, setDateTimeInput] = useState<string>("");
   const [returnInput, setReturnInput] = useState<string>("");
   const [valorParcialDisplay, setValorParcialDisplay] = useState<string>("");
+  const [visibleStops, setVisibleStops] = useState(0);
+  const [visibleReturnStops, setVisibleReturnStops] = useState(0);
   const paymentLabel = (p: string) =>
     p === "pix" ? "PIX" :
     p === "cash" ? "Dinheiro" :
@@ -75,14 +77,25 @@ export default function ServiceEditPage() {
     guide: z.string().nullable().optional(),
     hasReturn: z.boolean().optional(),
     returnDateTime: z.union([z.date(), z.string()]).optional(),
-    returnOrigin: z.string().optional(),
-    returnDestination: z.string().optional(),
-    returnFlight: z.string().optional(),
+    returnOrigin: z.string().nullable().optional(),
+    returnDestination: z.string().nullable().optional(),
+    returnFlight: z.string().nullable().optional(),
+    returnStop1: z.string().nullable().optional(),
+    returnStop2: z.string().nullable().optional(),
+    returnStop3: z.string().nullable().optional(),
+    returnStop4: z.string().nullable().optional(),
+    returnStop5: z.string().nullable().optional(),
+    returnKmPrevisto: z.union([z.string(), z.number()]).optional(),
     paxAdt: z.union([z.string(), z.number()]).optional(),
     paxChd: z.union([z.string(), z.number()]).optional(),
     paxInf: z.union([z.string(), z.number()]).optional(),
     paxSen: z.union([z.string(), z.number()]).optional(),
     paxFree: z.union([z.string(), z.number()]).optional(),
+    stop1: z.string().nullable().optional(),
+    stop2: z.string().nullable().optional(),
+    stop3: z.string().nullable().optional(),
+    stop4: z.string().nullable().optional(),
+    stop5: z.string().nullable().optional(),
   });
 
   const form = useForm<z.infer<typeof serviceFormSchema>>({
@@ -93,6 +106,11 @@ export default function ServiceEditPage() {
       clientId: "",
       origin: "",
       destination: "",
+      stop1: "",
+      stop2: "",
+      stop3: "",
+      stop4: "",
+      stop5: "",
       dateTime: new Date(),
       type: "airport",
       value: "0.00",
@@ -111,6 +129,12 @@ export default function ServiceEditPage() {
       returnOrigin: "",
       returnDestination: "",
       returnFlight: "",
+      returnStop1: "",
+      returnStop2: "",
+      returnStop3: "",
+      returnStop4: "",
+      returnStop5: "",
+      returnKmPrevisto: "",
       passengers: 0,
       bags: 0,
       paxAdt: "",
@@ -174,6 +198,17 @@ export default function ServiceEditPage() {
         returnOrigin: returnService?.origin ?? "",
         returnDestination: returnService?.destination ?? "",
         returnFlight: returnService?.flight ?? "",
+        returnStop1: returnService?.stop1 ?? "",
+        returnStop2: returnService?.stop2 ?? "",
+        returnStop3: returnService?.stop3 ?? "",
+        returnStop4: returnService?.stop4 ?? "",
+        returnStop5: returnService?.stop5 ?? "",
+        returnKmPrevisto: returnService?.kmPrevisto != null ? String(returnService.kmPrevisto) : "",
+        stop1: service.stop1 ?? "",
+        stop2: service.stop2 ?? "",
+        stop3: service.stop3 ?? "",
+        stop4: service.stop4 ?? "",
+        stop5: service.stop5 ?? "",
         kmPrevisto: service.kmPrevisto != null ? String(service.kmPrevisto) : "",
         guide: service.guide ?? "",
         restanteMetodoDriver: service.restanteMetodoDriver ?? undefined,
@@ -183,6 +218,28 @@ export default function ServiceEditPage() {
       setValueDisplay(
         (isFinite(amount) ? amount : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
       );
+      const initialStopsCount = [
+        service.stop1,
+        service.stop2,
+        service.stop3,
+        service.stop4,
+        service.stop5,
+      ]
+        .map((v: any) => String(v || "").trim())
+        .filter(Boolean)
+        .length;
+      setVisibleStops(initialStopsCount);
+      const initialReturnStopsCount = [
+        returnService?.stop1,
+        returnService?.stop2,
+        returnService?.stop3,
+        returnService?.stop4,
+        returnService?.stop5,
+      ]
+        .map((v: any) => String(v || "").trim())
+        .filter(Boolean)
+        .length;
+      setVisibleReturnStops(initialReturnStopsCount);
     }
     load();
     return () => {
@@ -340,6 +397,11 @@ export default function ServiceEditPage() {
       })(),
       restanteMetodo: values.restanteMetodo || undefined,
       restanteMetodoDriver: values.restanteMetodo === "pay_driver" ? values.restanteMetodoDriver || undefined : undefined,
+      stop1: values.stop1 ? String(values.stop1).trim() : undefined,
+      stop2: values.stop2 ? String(values.stop2).trim() : undefined,
+      stop3: values.stop3 ? String(values.stop3).trim() : undefined,
+      stop4: values.stop4 ? String(values.stop4).trim() : undefined,
+      stop5: values.stop5 ? String(values.stop5).trim() : undefined,
     };
 
     try {
@@ -371,6 +433,12 @@ export default function ServiceEditPage() {
               driverId: values.returnDriverId ? parseInt(values.returnDriverId) : undefined,
               vehicleId: values.returnVehicleId ? parseInt(values.returnVehicleId) : undefined,
               flight: values.returnFlight ? String(values.returnFlight).trim() : undefined,
+              stop1: values.returnStop1 ? String(values.returnStop1).trim() : undefined,
+              stop2: values.returnStop2 ? String(values.returnStop2).trim() : undefined,
+              stop3: values.returnStop3 ? String(values.returnStop3).trim() : undefined,
+              stop4: values.returnStop4 ? String(values.returnStop4).trim() : undefined,
+              stop5: values.returnStop5 ? String(values.returnStop5).trim() : undefined,
+              kmPrevisto: values.returnKmPrevisto != null && values.returnKmPrevisto !== "" ? String(values.returnKmPrevisto).replace(",", ".") : undefined,
               guide: values.guide ? String(values.guide).trim() : undefined,
               notes: values.notes ? String(values.notes).trim() : undefined,
               passengers: passengersFinal || undefined,
@@ -416,6 +484,37 @@ export default function ServiceEditPage() {
       variant: "destructive",
     });
   };
+
+  const routeOrigin = String(form.watch("origin") || "").trim();
+  const routeDestination = String(form.watch("destination") || "").trim();
+  const routeStops = [
+    form.watch("stop1"),
+    form.watch("stop2"),
+    form.watch("stop3"),
+    form.watch("stop4"),
+    form.watch("stop5"),
+  ]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+  const routeWaypointsParam = routeStops.length > 0
+    ? `&waypoints=${routeStops.map((s) => encodeURIComponent(s)).join("|")}`
+    : "";
+  const routeAndKmUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(routeOrigin)}&destination=${encodeURIComponent(routeDestination)}${routeWaypointsParam}&travelmode=driving`;
+  const returnRouteOrigin = String(form.watch("returnOrigin") || "").trim();
+  const returnRouteDestination = String(form.watch("returnDestination") || "").trim();
+  const returnRouteStops = [
+    form.watch("returnStop1"),
+    form.watch("returnStop2"),
+    form.watch("returnStop3"),
+    form.watch("returnStop4"),
+    form.watch("returnStop5"),
+  ]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+  const returnRouteWaypointsParam = returnRouteStops.length > 0
+    ? `&waypoints=${returnRouteStops.map((s) => encodeURIComponent(s)).join("|")}`
+    : "";
+  const returnRouteAndKmUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(returnRouteOrigin)}&destination=${encodeURIComponent(returnRouteDestination)}${returnRouteWaypointsParam}&travelmode=driving`;
 
   return (
     <Layout>
@@ -546,7 +645,7 @@ export default function ServiceEditPage() {
               )}
             </div>
             <div className="rounded-lg border border-border/70 p-4 space-y-4">
-              <h3 className="text-sm font-semibold text-primary">Agendamento</h3>
+              <h3 className="text-sm font-semibold text-primary">Agendamento e Dados da Viagem</h3>
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="dateTime" render={({ field }) => (
                   <FormItem>
@@ -580,101 +679,6 @@ export default function ServiceEditPage() {
                   <FormMessage />
                 </FormItem>
               )} />
-              {!currentIsReturnService ? (
-                <FormField
-                  control={form.control}
-                  name="hasReturn"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border border-border/70 p-3">
-                      <FormControl>
-                        <Checkbox
-                          checked={Boolean(field.value)}
-                          onCheckedChange={(checked) => {
-                            const enabled = Boolean(checked);
-                            field.onChange(enabled);
-                            if (!enabled) {
-                              setReturnInput("");
-                              form.setValue("returnDateTime", undefined);
-                              form.setValue("returnOrigin", "");
-                              form.setValue("returnDestination", "");
-                              form.setValue("returnFlight", "");
-                              form.setValue("returnDriverId", "");
-                              form.setValue("returnVehicleId", "");
-                            }
-                          }}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Criar viagem de retorno vinculada</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              ) : (
-                <div className="rounded-md border border-border/70 p-3 text-sm text-muted-foreground">
-                  Esta é uma viagem de retorno vinculada a outra viagem.
-                </div>
-              )}
-              {!currentIsReturnService && form.watch("hasReturn") && (
-                <div className="rounded-md border border-primary/40 bg-primary/5 p-4 space-y-4">
-                  <div className="text-sm font-medium">Viagem de retorno vinculada</div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField control={form.control} name="returnDateTime" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Data/Hora retorno</FormLabel>
-                        <FormControl>
-                          <Input type="datetime-local" value={returnInput || (field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : "")}
-                            onChange={(e) => { const v = e.target.value; setReturnInput(v); if (!v) { field.onChange(undefined); return; } if (v.length >= 16) { const d = new Date(v); if (!isNaN(d.getTime())) field.onChange(d); }}}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="returnFlight" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Voo retorno</FormLabel>
-                        <FormControl><Input value={field.value ?? ""} onChange={field.onChange} placeholder="Ex.: G3 9876" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField control={form.control} name="returnOrigin" render={({ field }) => (
-                      <FormItem><FormLabel>Origem retorno</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="returnDestination" render={({ field }) => (
-                      <FormItem><FormLabel>Destino retorno</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField control={form.control} name="returnDriverId" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Motorista retorno</FormLabel>
-                        <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Atribuir motorista" /></SelectTrigger></FormControl>
-                          <SelectContent>{drivers?.map(d => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="returnVehicleId" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Veículo retorno</FormLabel>
-                        <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Atribuir veículo" /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            {(vehicles || []).map(v => <SelectItem key={v.id} value={v.id.toString()}>{v.model} ({v.plate})</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="rounded-lg border border-border/70 p-4 space-y-4">
-              <h3 className="text-sm font-semibold text-primary">Dados da Viagem</h3>
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem>
                 <FormLabel>Observações</FormLabel>
@@ -821,6 +825,49 @@ export default function ServiceEditPage() {
                 <FormItem><FormLabel>Destino</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
+            <div className="space-y-3">
+              <div className="text-sm font-medium">Paradas (opcional, até 5)</div>
+              {visibleStops === 0 ? (
+                <Button type="button" variant="outline" onClick={() => setVisibleStops(1)}>
+                  Adicionar parada
+                </Button>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {visibleStops >= 1 && (
+                      <FormField control={form.control} name="stop1" render={({ field }) => (
+                        <FormItem><FormLabel>Parada 1</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    )}
+                    {visibleStops >= 2 && (
+                      <FormField control={form.control} name="stop2" render={({ field }) => (
+                        <FormItem><FormLabel>Parada 2</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    )}
+                    {visibleStops >= 3 && (
+                      <FormField control={form.control} name="stop3" render={({ field }) => (
+                        <FormItem><FormLabel>Parada 3</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    )}
+                    {visibleStops >= 4 && (
+                      <FormField control={form.control} name="stop4" render={({ field }) => (
+                        <FormItem><FormLabel>Parada 4</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    )}
+                    {visibleStops >= 5 && (
+                      <FormField control={form.control} name="stop5" render={({ field }) => (
+                        <FormItem><FormLabel>Parada 5</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    )}
+                  </div>
+                  {visibleStops < 5 && (
+                    <Button type="button" variant="outline" onClick={() => setVisibleStops((v) => Math.min(5, v + 1))}>
+                      Adicionar mais paradas
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="kmPrevisto" render={({ field }) => (
                 <FormItem>
@@ -830,11 +877,167 @@ export default function ServiceEditPage() {
                 </FormItem>
               )} />
               <div className="flex items-end">
-                <Button type="button" variant="secondary" asChild disabled={!form.watch("origin") || !form.watch("destination")}>
-                  <a href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(String(form.watch("origin") || ""))}&destination=${encodeURIComponent(String(form.watch("destination") || ""))}&travelmode=driving`} target="_blank" rel="noreferrer">Ver rota e Km</a>
+                <Button type="button" variant="secondary" asChild disabled={!routeOrigin || !routeDestination}>
+                  <a href={routeAndKmUrl} target="_blank" rel="noreferrer">Ver rota e Km</a>
                 </Button>
               </div>
             </div>
+            {!currentIsReturnService ? (
+              <FormField
+                control={form.control}
+                name="hasReturn"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border border-border/70 p-3">
+                    <FormControl>
+                      <Checkbox
+                        checked={Boolean(field.value)}
+                        onCheckedChange={(checked) => {
+                          const enabled = Boolean(checked);
+                          field.onChange(enabled);
+                          if (!enabled) {
+                            setReturnInput("");
+                            form.setValue("returnDateTime", undefined);
+                            form.setValue("returnOrigin", "");
+                            form.setValue("returnDestination", "");
+                            form.setValue("returnFlight", "");
+                            form.setValue("returnDriverId", "");
+                            form.setValue("returnVehicleId", "");
+                            form.setValue("returnStop1", "");
+                            form.setValue("returnStop2", "");
+                            form.setValue("returnStop3", "");
+                            form.setValue("returnStop4", "");
+                            form.setValue("returnStop5", "");
+                            form.setValue("returnKmPrevisto", "");
+                            setVisibleReturnStops(0);
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Criar viagem de retorno vinculada</FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <div className="rounded-md border border-border/70 p-3 text-sm text-muted-foreground">
+                Esta é uma viagem de retorno vinculada a outra viagem.
+              </div>
+            )}
+            {!currentIsReturnService && form.watch("hasReturn") && (
+              <div className="rounded-md border border-primary/40 bg-primary/5 p-4 space-y-4">
+                <div className="text-sm font-medium">Viagem de retorno vinculada</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="returnDateTime" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data/Hora retorno</FormLabel>
+                      <FormControl>
+                        <Input type="datetime-local" value={returnInput || (field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : "")}
+                          onChange={(e) => { const v = e.target.value; setReturnInput(v); if (!v) { field.onChange(undefined); return; } if (v.length >= 16) { const d = new Date(v); if (!isNaN(d.getTime())) field.onChange(d); }}}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="returnFlight" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Voo retorno</FormLabel>
+                      <FormControl><Input value={field.value ?? ""} onChange={field.onChange} placeholder="Ex.: G3 9876" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="returnOrigin" render={({ field }) => (
+                    <FormItem><FormLabel>Origem retorno</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="returnDestination" render={({ field }) => (
+                    <FormItem><FormLabel>Destino retorno</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+                <div className="space-y-3">
+                  <div className="text-sm font-medium">Paradas retorno (opcional, até 5)</div>
+                  {visibleReturnStops === 0 ? (
+                    <Button type="button" variant="outline" onClick={() => setVisibleReturnStops(1)}>
+                      Adicionar parada retorno
+                    </Button>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {visibleReturnStops >= 1 && (
+                          <FormField control={form.control} name="returnStop1" render={({ field }) => (
+                            <FormItem><FormLabel>Parada retorno 1</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                        )}
+                        {visibleReturnStops >= 2 && (
+                          <FormField control={form.control} name="returnStop2" render={({ field }) => (
+                            <FormItem><FormLabel>Parada retorno 2</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                        )}
+                        {visibleReturnStops >= 3 && (
+                          <FormField control={form.control} name="returnStop3" render={({ field }) => (
+                            <FormItem><FormLabel>Parada retorno 3</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                        )}
+                        {visibleReturnStops >= 4 && (
+                          <FormField control={form.control} name="returnStop4" render={({ field }) => (
+                            <FormItem><FormLabel>Parada retorno 4</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                        )}
+                        {visibleReturnStops >= 5 && (
+                          <FormField control={form.control} name="returnStop5" render={({ field }) => (
+                            <FormItem><FormLabel>Parada retorno 5</FormLabel><FormControl><Input value={field.value ?? ""} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                        )}
+                      </div>
+                      {visibleReturnStops < 5 && (
+                        <Button type="button" variant="outline" onClick={() => setVisibleReturnStops((v) => Math.min(5, v + 1))}>
+                          Adicionar mais paradas retorno
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="returnKmPrevisto" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>KM da Rota retorno</FormLabel>
+                      <FormControl><Input type="text" inputMode="decimal" value={String(field.value ?? "")} onChange={(e) => field.onChange(e.target.value)} placeholder="0,00" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <div className="flex items-end">
+                    <Button type="button" variant="secondary" asChild disabled={!returnRouteOrigin || !returnRouteDestination}>
+                      <a href={returnRouteAndKmUrl} target="_blank" rel="noreferrer">Ver rota e Km retorno</a>
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="returnDriverId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Motorista retorno</FormLabel>
+                      <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Atribuir motorista" /></SelectTrigger></FormControl>
+                        <SelectContent>{drivers?.map(d => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="returnVehicleId" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Veículo retorno</FormLabel>
+                      <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Atribuir veículo" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {(vehicles || []).map(v => <SelectItem key={v.id} value={v.id.toString()}>{v.model} ({v.plate})</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+              </div>
+            )}
             </div>
             <div className="rounded-lg border border-border/70 p-4 space-y-4">
               <h3 className="text-sm font-semibold text-primary">Financeiro e Alocação</h3>

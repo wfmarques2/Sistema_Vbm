@@ -27,4 +27,4 @@ export const users = pgTable("users", {
 });
 
 export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect & { role?: "admin" | "operational" | "driver" };
+export type User = typeof users.$inferSelect & { role?: "admin" | "operational" | "driver"; driverId?: number | null };

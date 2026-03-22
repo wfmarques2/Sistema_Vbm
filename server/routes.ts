@@ -6,11 +6,12 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { seedDatabase } from "./seed";
 import { db } from "./db";
-import { users, localAuth, userInvitations, profiles, insertUserInvitationSchema, adminCreateUserSchema, registerPasswordSchema, services, vehicleExpenses, companyExpenses, driverPayments, paymentMethodEnum, paymentStatusEnum, vehicleKmLogs, companyRevenues, clients, drivers } from "@shared/schema";
-import { eq, and, or, sql, gte, lt, asc, desc } from "drizzle-orm";
+import { users, localAuth, userInvitations, profiles, insertUserInvitationSchema, adminCreateUserSchema, registerPasswordSchema, services, vehicleExpenses, companyExpenses, driverPayments, paymentMethodEnum, paymentStatusEnum, vehicleKmLogs, companyRevenues, clients, drivers, driverPushTokens } from "@shared/schema";
+import { eq, and, or, sql, gte, lt, asc, desc, inArray } from "drizzle-orm";
 import { pbkdf2Sync, randomBytes } from "crypto";
 import { financialService } from "./services/financial";
 import { vehicleCostService } from "./services/vehicle-cost";
+import { sendPushToDriverTokens } from "./services/push-notifications";
 
 const parseCookies = (cookieHeader?: string) => {
   const cookies: Record<string, string> = {};
@@ -22,6 +23,52 @@ const parseCookies = (cookieHeader?: string) => {
   });
   return cookies;
 };
+
+const formatServiceDateTime = (value: unknown) => {
+  const date = value instanceof Date ? value : new Date(String(value || ""));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+async function notifyDriverAssigned(input: {
+  service: { id: number; driverId: number | null; dateTime: unknown; origin: string; destination: string };
+  reason: "created" | "assigned" | "reassigned" | "updated";
+}) {
+  const { service, reason } = input;
+  if (!service.driverId) return;
+
+  const tokensRows = await db.select().from(driverPushTokens).where(eq(driverPushTokens.driverId, service.driverId));
+  const tokens = tokensRows.map((t) => t.token);
+  if (!tokens.length) return;
+
+  const when = formatServiceDateTime(service.dateTime);
+  const route = `${String(service.origin || "").trim()} → ${String(service.destination || "").trim()}`;
+  const title =
+    reason === "created" || reason === "assigned" || reason === "reassigned"
+      ? "Nova viagem designada"
+      : "Viagem atualizada";
+  const body = [when, route].filter(Boolean).join(" • ");
+
+  const result = await sendPushToDriverTokens(tokens, {
+    title,
+    body: body || `Viagem #${service.id}`,
+    data: {
+      serviceId: String(service.id),
+      reason,
+      type: "service_assignment",
+    },
+  });
+
+  if (result.invalidTokens.length > 0) {
+    await db.delete(driverPushTokens).where(inArray(driverPushTokens.token, result.invalidTokens));
+  }
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -235,7 +282,8 @@ export async function registerRoutes(
         (m === "GET" && /^\/api\/services\/\d+$/.test(p)) ||
         (m === "PUT" && /^\/api\/services\/\d+$/.test(p)) ||
         (m === "POST" && /^\/api\/services\/\d+\/expenses$/.test(p)) ||
-        (m === "POST" && /^\/api\/financial\/vehicle-km-logs$/.test(p));
+        (m === "POST" && /^\/api\/financial\/vehicle-km-logs$/.test(p)) ||
+        (m === "POST" && /^\/api\/notifications\/fcm-token$/.test(p));
       if (!allow) return res.status(403).json({ message: "Acesso restrito para Motorista" });
       // Não tenta mutar req.query para evitar erros; filtro forçado é aplicado dentro do handler.
       if (/^\/api\/services\/\d+$/.test(p)) {
@@ -277,6 +325,78 @@ export async function registerRoutes(
       next();
     } catch {
       return res.status(500).json({ message: "Erro de autorização" });
+    }
+  });
+
+  app.post("/api/notifications/fcm-token", async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const schema = z.object({
+        token: z.string().min(20),
+        platform: z.string().optional(),
+      });
+      const { token, platform } = schema.parse(req.body);
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      let [profile] = await db.select().from(profiles).where(eq(profiles.userId, userId));
+      if (profile && !profile.driverId && user) {
+        const emailLc = String(user.email || "").trim().toLowerCase();
+        let driverId: number | null = null;
+        if (emailLc) {
+          const [d] = await db.select().from(drivers).where(sql`lower(${drivers.email}) = ${emailLc}`);
+          driverId = d?.id ?? null;
+        }
+        if (!driverId) {
+          const fullNameLc = `${String(user.firstName || "").trim()} ${String(user.lastName || "").trim()}`.trim().toLowerCase();
+          if (fullNameLc) {
+            const allDrivers = await db.select().from(drivers);
+            const fullTokens = fullNameLc.split(/\s+/).filter((t) => t.length >= 2);
+            const best = allDrivers.find((d) => {
+              const dn = String(d.name || "").trim().toLowerCase();
+              if (!dn) return false;
+              if (dn === fullNameLc || dn.includes(fullNameLc) || fullNameLc.includes(dn)) return true;
+              const tokenMatches = fullTokens.filter((t) => dn.includes(t)).length;
+              return tokenMatches >= Math.min(2, fullTokens.length);
+            });
+            driverId = best?.id ?? null;
+          }
+        }
+        if (driverId) {
+          await db.update(profiles).set({ driverId }).where(eq(profiles.id, profile.id));
+          [profile] = await db.select().from(profiles).where(eq(profiles.userId, userId));
+        }
+      }
+      if (!profile || !profile.driverId) {
+        return res.status(403).json({ message: "Usuário sem motorista vinculado. Vincule em Configurações > Usuários." });
+      }
+      const normalizedToken = token.trim();
+      const existingByToken = await db.select().from(driverPushTokens).where(eq(driverPushTokens.token, normalizedToken));
+      const userAgent = String(req.headers["user-agent"] || "").slice(0, 500);
+      if (existingByToken.length > 0) {
+        await db
+          .update(driverPushTokens)
+          .set({
+            driverId: Number(profile.driverId),
+            platform: platform?.slice(0, 50) || null,
+            userAgent: userAgent || null,
+            updatedAt: new Date(),
+          })
+          .where(eq(driverPushTokens.token, normalizedToken));
+      } else {
+        await db.insert(driverPushTokens).values({
+          driverId: Number(profile.driverId),
+          token: normalizedToken,
+          platform: platform?.slice(0, 50) || null,
+          userAgent: userAgent || null,
+          updatedAt: new Date(),
+        });
+      }
+      return res.json({ ok: true });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      return res.status(500).json({ message: "Erro ao registrar token push" });
     }
   });
 
@@ -998,6 +1118,20 @@ export async function registerRoutes(
       } catch (e) {
         console.error("[services.create] erro ao debitar saldo:", e);
       }
+      try {
+        await notifyDriverAssigned({
+          service: {
+            id: service.id,
+            driverId: service.driverId ?? null,
+            dateTime: service.dateTime,
+            origin: String(service.origin || ""),
+            destination: String(service.destination || ""),
+          },
+          reason: "created",
+        });
+      } catch (e) {
+        console.error("[services.create] erro ao enviar push:", e);
+      }
       res.status(201).json(service);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1087,6 +1221,30 @@ export async function registerRoutes(
         }
       } catch (e) {
         console.error("[services.update] erro ao debitar saldo:", e);
+      }
+      try {
+        const prevDriverId = prevService?.driverId ?? null;
+        const currentDriverId = service.driverId ?? null;
+        const reason =
+          !prevDriverId && currentDriverId
+            ? "assigned"
+            : prevDriverId && currentDriverId && prevDriverId !== currentDriverId
+            ? "reassigned"
+            : "updated";
+        if (currentDriverId && (reason !== "updated" || service.status !== prevService?.status)) {
+          await notifyDriverAssigned({
+            service: {
+              id: service.id,
+              driverId: currentDriverId,
+              dateTime: service.dateTime,
+              origin: String(service.origin || ""),
+              destination: String(service.destination || ""),
+            },
+            reason,
+          });
+        }
+      } catch (e) {
+        console.error("[services.update] erro ao enviar push:", e);
       }
       res.json(service);
     } catch (err) {

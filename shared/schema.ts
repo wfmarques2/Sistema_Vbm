@@ -65,6 +65,16 @@ export const drivers = pgTable("drivers", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const driverPushTokens = pgTable("driver_push_tokens", {
+  id: serial("id").primaryKey(),
+  driverId: integer("driver_id").notNull().references(() => drivers.id),
+  token: text("token").notNull().unique(),
+  platform: text("platform"),
+  userAgent: text("user_agent"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const vehicles = pgTable("vehicles", {
   id: serial("id").primaryKey(),
   model: text("model").notNull(),
@@ -83,6 +93,11 @@ export const services = pgTable("services", {
   dateTime: timestamp("date_time").notNull(),
   origin: text("origin").notNull(),
   destination: text("destination").notNull(),
+  stop1: text("stop_1"),
+  stop2: text("stop_2"),
+  stop3: text("stop_3"),
+  stop4: text("stop_4"),
+  stop5: text("stop_5"),
   type: text("type", { enum: serviceTypeEnum }).notNull(),
   clientName: text("client_name").notNull(),
   clientPhone: text("client_phone").notNull(),
@@ -260,6 +275,11 @@ export const driversRelations = relations(drivers, ({ many }) => ({
   services: many(services),
   kmLogs: many(vehicleKmLogs),
   payments: many(driverPayments),
+  pushTokens: many(driverPushTokens),
+}));
+
+export const driverPushTokensRelations = relations(driverPushTokens, ({ one }) => ({
+  driver: one(drivers, { fields: [driverPushTokens.driverId], references: [drivers.id] }),
 }));
 
 export const vehiclesRelations = relations(vehicles, ({ many }) => ({
@@ -313,6 +333,7 @@ export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true 
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true });
 export const insertClientDependentSchema = createInsertSchema(clientDependents).omit({ id: true, createdAt: true });
 export const insertDriverSchema = createInsertSchema(drivers).omit({ id: true, createdAt: true });
+export const insertDriverPushTokenSchema = createInsertSchema(driverPushTokens).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertVehicleSchema = createInsertSchema(vehicles)
   .omit({ id: true, createdAt: true })
   .extend({
@@ -366,6 +387,8 @@ export type ClientWithDependents = Client & {
 
 export type Driver = typeof drivers.$inferSelect;
 export type InsertDriver = z.infer<typeof insertDriverSchema>;
+export type DriverPushToken = typeof driverPushTokens.$inferSelect;
+export type InsertDriverPushToken = z.infer<typeof insertDriverPushTokenSchema>;
 
 export type Vehicle = typeof vehicles.$inferSelect;
 export type InsertVehicle = z.infer<typeof insertVehicleSchema>;

@@ -356,8 +356,24 @@ export default function AgendaPage() {
             const tripDestination = isReturnItem ? (selectedItem?.destination || s.returnDestination || s.origin) : s.destination;
             const tripDateTime = isReturnItem ? (selectedItem?.dateTime || s.returnDateTime || s.dateTime) : s.dateTime;
             const tripDriver = isReturnItem ? (selectedItem?.driverName || s.driver?.name || "Não atribuído") : (s.driver?.name || "Não atribuído");
-            const originUrlGmaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tripOrigin)}`;
-            const destUrlGmaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tripDestination)}`;
+            const tripStops = [
+              s.stop1,
+              s.stop2,
+              s.stop3,
+              s.stop4,
+              s.stop5,
+            ]
+              .map((v: any) => String(v || "").trim())
+              .filter(Boolean);
+            const navigationSteps = [
+              { title: "Dirigir até o embarque", address: tripOrigin, pinClassName: "text-primary" },
+              ...tripStops.map((stop: string, idx: number) => ({
+                title: `Dirigir até a parada ${idx + 1}`,
+                address: stop,
+                pinClassName: "text-amber-500",
+              })),
+              { title: "Dirigir até o destino", address: tripDestination, pinClassName: "text-blue-400" },
+            ];
             const whatsappUrl = buildWhatsappUrl(s.clientPhone);
             const serviceId = s.id;
             const vehicleId = isReturnItem ? (s.returnVehicleId || s.vehicleId) : s.vehicleId;
@@ -509,38 +525,24 @@ export default function AgendaPage() {
                 <div className="mt-4">
                   <div className="text-primary font-semibold mb-2">Navegação</div>
                   <div className="space-y-3">
-                    <div className="rounded-xl border border-border bg-card p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <MapPin className="w-4 h-4 text-primary" />
-                        <div className="font-medium">Dirigir até o embarque</div>
+                    {navigationSteps.map((step) => (
+                      <div key={`${serviceId}-${step.title}-${step.address}`} className="rounded-xl border border-border bg-card p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <MapPin className={`w-4 h-4 ${step.pinClassName}`} />
+                          <div className="font-medium">{step.title}</div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button type="button" onClick={() => openWaze(step.address)} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 w-full">
+                            <SiWaze className="w-5 h-5 text-[#86d1ff]" />
+                            <span>Waze</span>
+                          </button>
+                          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(step.address)}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 w-full">
+                            <SiGooglemaps className="w-5 h-5 text-[#47b66e]" />
+                            <span>Google Maps</span>
+                          </a>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button type="button" onClick={() => openWaze(tripOrigin)} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 w-full">
-                          <SiWaze className="w-5 h-5 text-[#86d1ff]" />
-                          <span>Waze</span>
-                        </button>
-                        <a href={originUrlGmaps} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 w-full">
-                          <SiGooglemaps className="w-5 h-5 text-[#47b66e]" />
-                          <span>Google Maps</span>
-                        </a>
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-border bg-card p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <MapPin className="w-4 h-4 text-blue-400" />
-                        <div className="font-medium">Dirigir até o destino</div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button type="button" onClick={() => openWaze(tripDestination)} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 w-full">
-                          <SiWaze className="w-5 h-5 text-[#86d1ff]" />
-                          <span>Waze</span>
-                        </button>
-                        <a href={destUrlGmaps} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-md bg-muted hover:bg-muted/80 w-full">
-                          <SiGooglemaps className="w-5 h-5 text-[#47b66e]" />
-                          <span>Google Maps</span>
-                        </a>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
                 {!isReturnItem && (

@@ -7,12 +7,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FormEvent, useCallback, useEffect, useMemo } from "react";
 import { useTheme } from "next-themes";
+import { Switch } from "@/components/ui/switch";
+import { Moon, Sun } from "lucide-react";
 import vbmLogoDarkUrl from "@assets/vbm-logo-1.png?url";
 import vbmLogoLightUrl from "@assets/vbm-logo-2.png?url";
 
 export default function LoginPage() {
   const { toast } = useToast();
-  const { theme, resolvedTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -137,7 +139,15 @@ export default function LoginPage() {
       </div>
 
       {/* Right Side - Login */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative">
+        <div className="lg:hidden absolute top-4 right-4 flex items-center gap-2 rounded-lg border border-border/60 bg-card/80 px-3 py-2 backdrop-blur">
+          {currentTheme === "dark" ? <Moon className="w-4 h-4 text-muted-foreground" /> : <Sun className="w-4 h-4 text-muted-foreground" />}
+          <Switch
+            checked={currentTheme === "dark"}
+            onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+            className="data-[state=checked]:bg-primary"
+          />
+        </div>
         <div className="w-full max-w-md space-y-8">
           <div className="text-center lg:text-left">
             <img src={mobileLogoUrl} alt="VBM Transfer Executivo" className="lg:hidden mx-auto mb-4 w-24 h-24 object-contain" />

@@ -30,6 +30,7 @@ import RegisterSetupPage from "@/pages/register-setup";
 import ServiceVoucherPage from "@/pages/service-voucher";
 import ServiceEditPage from "@/pages/service-edit";
 import DriverHistoryPage from "@/pages/driver-history";
+import { useDriverPushRegistration } from "@/hooks/use-driver-push";
 
 function ProtectedRoute({ component: Component, allow }: { component: React.ComponentType, allow?: Array<"admin" | "operational" | "driver"> }) {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -129,13 +130,24 @@ function Router() {
   );
 }
 
+function AppContent() {
+  useDriverPushRegistration();
+
+  return (
+    <>
+      <Toaster />
+      <Router />
+    </>
+  );
+}
+
 function App() {
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
         <TooltipProvider>
-          <Toaster />
-          <Router />
+          <AppContent />
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

@@ -224,6 +224,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Menu className="w-6 h-6" />
           </Button>
           <span className="ml-4 font-display font-semibold text-lg">VBM Transfer Executivo</span>
+          <div className="ml-auto flex items-center gap-2">
+            {currentTheme === "dark" ? <Moon className="w-4 h-4 text-muted-foreground" /> : <Sun className="w-4 h-4 text-muted-foreground" />}
+            <Switch
+              checked={currentTheme === "dark"}
+              onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+              className="data-[state=checked]:bg-primary"
+            />
+          </div>
         </header>
 
         <div className="flex-1 p-4 md:p-8 overflow-auto">

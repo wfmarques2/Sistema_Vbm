@@ -8,6 +8,7 @@ type ServiceFilters = z.infer<NonNullable<typeof api.services.list.input>>;
 
 export function useServices(filters?: ServiceFilters) {
   const queryKey = [api.services.list.path, filters];
+  const isDriverScoped = Boolean(filters?.driverId);
   return useQuery({
     queryKey,
     queryFn: async () => {
@@ -21,6 +22,8 @@ export function useServices(filters?: ServiceFilters) {
       if (!res.ok) throw new Error("Failed to fetch services");
       return api.services.list.responses[200].parse(await res.json());
     },
+    refetchInterval: isDriverScoped ? 10000 : false,
+    refetchOnWindowFocus: true,
   });
 }
 

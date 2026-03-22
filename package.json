@@ -11,7 +11,6 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
-    "express-rate-limit": "^7.4.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@radix-ui/react-accordion": "^1.2.4",
@@ -54,8 +53,10 @@
     "embla-carousel-react": "^8.6.0",
     "exceljs": "^4.4.0",
     "express": "^5.0.1",
+    "express-rate-limit": "^7.4.0",
     "express-session": "^1.19.0",
     "file-saver": "^2.0.5",
+    "firebase": "^11.10.0",
     "framer-motion": "^11.13.1",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
