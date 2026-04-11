@@ -88,10 +88,24 @@ export default function AgendaPage() {
   }
 
   function buildWhatsappUrl(phone?: string | null): string | null {
-    const digits = String(phone || "").replace(/\D/g, "");
+    const raw = String(phone || "").trim();
+    if (!raw) return null;
+
+    const isInternational = raw.startsWith("+");
+    const digits = raw.replace(/\D/g, "");
     if (!digits) return null;
-    const withCountry = digits.startsWith("55") ? digits : `55${digits}`;
-    return `https://wa.me/${withCountry}`;
+
+    // Regra solicitada:
+    // - Com "+" => internacional, mantém DDI informado.
+    // - Sem "+" => nacional, força DDI do Brasil.
+    let normalized = digits;
+    if (!isInternational) {
+      const national = digits.replace(/^0+/, "");
+      normalized = national.startsWith("55") ? national : `55${national}`;
+    }
+
+    if (normalized.length < 8 || normalized.length > 15) return null;
+    return `https://wa.me/${normalized}`;
   }
 
   function paymentMethodLabel(method?: string | null): string {
