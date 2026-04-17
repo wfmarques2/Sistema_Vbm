@@ -594,6 +594,7 @@ function UnifiedExpenseCreate({ drivers, vehicles, createUnified }: { drivers: a
               <SelectItem value="cash">Dinheiro</SelectItem>
               <SelectItem value="credit_card">Cartão crédito</SelectItem>
               <SelectItem value="debit_card">Cartão débito</SelectItem>
+              <SelectItem value="mozio">MOZIO</SelectItem>
             </SelectContent>
           </Select>
           <Select value={status} onValueChange={setStatus}>

@@ -696,7 +696,8 @@ function paymentLabel(p: string) {
   return p === "pix" ? "PIX" :
     p === "cash" ? "Dinheiro" :
     p === "credit_card" ? "Cartão crédito" :
-    p === "debit_card" ? "Cartão débito" : p || "-";
+    p === "debit_card" ? "Cartão débito" :
+    p === "mozio" ? "MOZIO" : p || "-";
 }
 
 function paymentStatusLabel(s: string) {

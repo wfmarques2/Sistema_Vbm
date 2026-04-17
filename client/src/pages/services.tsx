@@ -481,6 +481,7 @@ export default function ServicesPage() {
     p === "cash" ? "Dinheiro" :
     p === "credit_card" ? "Cartão crédito" :
     p === "debit_card" ? "Cartão débito" :
+    p === "mozio" ? "MOZIO" :
     p === "saldo" ? "Saldo" : p;
 
   const paymentStatusLabel = (s: string) =>
@@ -669,7 +670,7 @@ export default function ServicesPage() {
                 const valorDigits = valorStr.replace(/\D/g, "");
                 const valorNum = valorDigits ? (parseInt(valorDigits, 10) / 100) : 0;
                 const methodMap: Record<string,string> = {
-                  "pix":"pix","dinheiro":"cash","cash":"cash","cartão crédito":"credit_card","cartao credito":"credit_card","credit_card":"credit_card","cartão débito":"debit_card","cartao debito":"debit_card","debit_card":"debit_card","saldo":"saldo"
+                  "pix":"pix","dinheiro":"cash","cash":"cash","cartão crédito":"credit_card","cartao credito":"credit_card","credit_card":"credit_card","cartão débito":"debit_card","cartao debito":"debit_card","debit_card":"debit_card","saldo":"saldo","mozio":"mozio"
                 };
                 const pm = methodMap[metodoStr] || "pix";
                 const statusPayMap: Record<string,string> = {
@@ -974,6 +975,7 @@ export default function ServicesPage() {
                   <SelectItem value="cash">Dinheiro</SelectItem>
                   <SelectItem value="credit_card">Cartão crédito</SelectItem>
                   <SelectItem value="debit_card">Cartão débito</SelectItem>
+                  <SelectItem value="mozio">MOZIO</SelectItem>
                   <SelectItem value="saldo">Saldo</SelectItem>
                 </SelectContent>
               </Select>

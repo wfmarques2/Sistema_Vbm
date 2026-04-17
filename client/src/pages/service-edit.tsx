@@ -48,6 +48,7 @@ export default function ServiceEditPage() {
     p === "cash" ? "Dinheiro" :
     p === "credit_card" ? "Cartão crédito" :
     p === "debit_card" ? "Cartão débito" :
+    p === "mozio" ? "MOZIO" :
     p === "saldo" ? "Saldo" : p.toUpperCase();
   const paymentStatusLabel = (s: string) =>
     s === "paid" ? "Pago" :
@@ -74,6 +75,7 @@ export default function ServiceEditPage() {
     clientId: z.union([z.string(), z.number()]).nullable().optional(),
     value: z.union([z.string(), z.number()]),
     kmPrevisto: z.union([z.string(), z.number()]).optional(),
+    tempoEstimado: z.string().optional(),
     guide: z.string().nullable().optional(),
     hasReturn: z.boolean().optional(),
     returnDateTime: z.union([z.date(), z.string()]).optional(),
@@ -86,6 +88,7 @@ export default function ServiceEditPage() {
     returnStop4: z.string().nullable().optional(),
     returnStop5: z.string().nullable().optional(),
     returnKmPrevisto: z.union([z.string(), z.number()]).optional(),
+    returnTempoEstimado: z.string().optional(),
     paxAdt: z.union([z.string(), z.number()]).optional(),
     paxChd: z.union([z.string(), z.number()]).optional(),
     paxInf: z.union([z.string(), z.number()]).optional(),
@@ -123,6 +126,7 @@ export default function ServiceEditPage() {
       returnDriverId: "",
       returnVehicleId: "",
       kmPrevisto: "",
+      tempoEstimado: "",
       notes: "",
       guide: "",
       flight: "",
@@ -135,6 +139,7 @@ export default function ServiceEditPage() {
       returnStop4: "",
       returnStop5: "",
       returnKmPrevisto: "",
+      returnTempoEstimado: "",
       passengers: 0,
       bags: 0,
       paxAdt: "",
@@ -204,12 +209,14 @@ export default function ServiceEditPage() {
         returnStop4: returnService?.stop4 ?? "",
         returnStop5: returnService?.stop5 ?? "",
         returnKmPrevisto: returnService?.kmPrevisto != null ? String(returnService.kmPrevisto) : "",
+        returnTempoEstimado: returnService?.tempoEstimado != null ? String(returnService.tempoEstimado) : "",
         stop1: service.stop1 ?? "",
         stop2: service.stop2 ?? "",
         stop3: service.stop3 ?? "",
         stop4: service.stop4 ?? "",
         stop5: service.stop5 ?? "",
         kmPrevisto: service.kmPrevisto != null ? String(service.kmPrevisto) : "",
+        tempoEstimado: service.tempoEstimado != null ? String(service.tempoEstimado) : "",
         guide: service.guide ?? "",
         restanteMetodoDriver: service.restanteMetodoDriver ?? undefined,
       });
@@ -369,6 +376,7 @@ export default function ServiceEditPage() {
       clientPhone: clientPhoneFinal || values.clientPhone,
       value: normalized,
       kmPrevisto: values.kmPrevisto != null && values.kmPrevisto !== "" ? String(values.kmPrevisto).replace(",", ".") : undefined,
+      tempoEstimado: values.tempoEstimado ? String(values.tempoEstimado).trim() : undefined,
       driverId: values.driverId ? parseInt(values.driverId) : undefined,
       vehicleId: values.vehicleId ? parseInt(values.vehicleId) : undefined,
       hasReturn,
@@ -439,6 +447,7 @@ export default function ServiceEditPage() {
               stop4: values.returnStop4 ? String(values.returnStop4).trim() : undefined,
               stop5: values.returnStop5 ? String(values.returnStop5).trim() : undefined,
               kmPrevisto: values.returnKmPrevisto != null && values.returnKmPrevisto !== "" ? String(values.returnKmPrevisto).replace(",", ".") : undefined,
+              tempoEstimado: values.returnTempoEstimado ? String(values.returnTempoEstimado).trim() : undefined,
               guide: values.guide ? String(values.guide).trim() : undefined,
               notes: values.notes ? String(values.notes).trim() : undefined,
               passengers: passengersFinal || undefined,
@@ -515,6 +524,10 @@ export default function ServiceEditPage() {
     ? `&waypoints=${returnRouteStops.map((s) => encodeURIComponent(s)).join("|")}`
     : "";
   const returnRouteAndKmUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(returnRouteOrigin)}&destination=${encodeURIComponent(returnRouteDestination)}${returnRouteWaypointsParam}&travelmode=driving`;
+  const flightCode = String(form.watch("flight") || "").replace(/\s+/g, "").toUpperCase();
+  const flightAwareUrl = flightCode
+    ? `https://pt.flightaware.com/live/flight/${encodeURIComponent(flightCode)}`
+    : "";
 
   return (
     <Layout>
@@ -686,7 +699,7 @@ export default function ServiceEditPage() {
                 <FormMessage />
               </FormItem>
             )} />
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,0.9fr)_auto_minmax(0,1fr)_minmax(0,1fr)] md:items-end">
               <FormField control={form.control} name="flight" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Voo</FormLabel>
@@ -694,6 +707,19 @@ export default function ServiceEditPage() {
                   <FormMessage />
                 </FormItem>
               )} />
+              <div className="flex md:self-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={!flightAwareUrl}
+                  onClick={() => {
+                    if (!flightAwareUrl) return;
+                    window.open(flightAwareUrl, "_blank", "noopener,noreferrer");
+                  }}
+                >
+                  Consultar voo
+                </Button>
+              </div>
               <FormField control={form.control} name="passengers" render={({ field }) => {
                 const selectedVehicleId = Number(form.watch("vehicleId") || 0);
                 const selectedVehicle = (vehicles || []).find(v => v.id === selectedVehicleId);
@@ -868,7 +894,7 @@ export default function ServiceEditPage() {
                 </>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField control={form.control} name="kmPrevisto" render={({ field }) => (
                 <FormItem>
                   <FormLabel>KM da Rota</FormLabel>
@@ -876,9 +902,16 @@ export default function ServiceEditPage() {
                   <FormMessage />
                 </FormItem>
               )} />
+              <FormField control={form.control} name="tempoEstimado" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tempo Estimado (da Origem ao Destino)</FormLabel>
+                  <FormControl><Input value={String(field.value ?? "")} onChange={field.onChange} placeholder="Ex.: 1h20min" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
               <div className="flex items-end">
                 <Button type="button" variant="secondary" asChild disabled={!routeOrigin || !routeDestination}>
-                  <a href={routeAndKmUrl} target="_blank" rel="noreferrer">Ver rota e Km</a>
+                  <a href={routeAndKmUrl} target="_blank" rel="noreferrer">Ver Rota, Km e Tempo</a>
                 </Button>
               </div>
             </div>
@@ -908,6 +941,7 @@ export default function ServiceEditPage() {
                             form.setValue("returnStop4", "");
                             form.setValue("returnStop5", "");
                             form.setValue("returnKmPrevisto", "");
+                            form.setValue("returnTempoEstimado", "");
                             setVisibleReturnStops(0);
                           }
                         }}
@@ -998,17 +1032,24 @@ export default function ServiceEditPage() {
                     </>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
                   <FormField control={form.control} name="returnKmPrevisto" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>KM da Rota retorno</FormLabel>
+                      <FormLabel className="min-h-10 flex items-end">KM da Rota retorno</FormLabel>
                       <FormControl><Input type="text" inputMode="decimal" value={String(field.value ?? "")} onChange={(e) => field.onChange(e.target.value)} placeholder="0,00" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <div className="flex items-end">
+                  <FormField control={form.control} name="returnTempoEstimado" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="min-h-10 flex items-end">Tempo Estimado retorno (da Origem ao Destino)</FormLabel>
+                      <FormControl><Input value={String(field.value ?? "")} onChange={field.onChange} placeholder="Ex.: 1h20min" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <div className="flex md:self-end">
                     <Button type="button" variant="secondary" asChild disabled={!returnRouteOrigin || !returnRouteDestination}>
-                      <a href={returnRouteAndKmUrl} target="_blank" rel="noreferrer">Ver rota e Km retorno</a>
+                      <a href={returnRouteAndKmUrl} target="_blank" rel="noreferrer">Ver Rota, Km e Tempo retorno</a>
                     </Button>
                   </div>
                 </div>
@@ -1118,6 +1159,7 @@ export default function ServiceEditPage() {
                           <SelectItem value="cash">Dinheiro</SelectItem>
                           <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
                           <SelectItem value="debit_card">Cartão de Débito</SelectItem>
+                          <SelectItem value="mozio">MOZIO</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

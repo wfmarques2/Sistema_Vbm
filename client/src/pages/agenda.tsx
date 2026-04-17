@@ -114,12 +114,57 @@ export default function AgendaPage() {
       m === "cash" ? "Dinheiro" :
       m === "credit_card" ? "Cartão crédito" :
       m === "debit_card" ? "Cartão débito" :
+      m === "mozio" ? "MOZIO" :
       m === "saldo" ? "Saldo" :
       m ? m : "-";
   }
 
   function wazeWebUrl(address: string): string {
     return `https://waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`;
+  }
+
+  function buildFlightAwareUrl(flight?: string | null): string | null {
+    const code = String(flight || "").replace(/\s+/g, "").toUpperCase();
+    if (!code) return null;
+    return `https://pt.flightaware.com/live/flight/${encodeURIComponent(code)}`;
+  }
+
+  async function adjustTripDateTime(
+    serviceId: number,
+    currentDateTime?: string | Date | null,
+    delayMinutes?: number
+  ) {
+    const base = currentDateTime ? new Date(currentDateTime) : new Date();
+    if (isNaN(base.getTime())) return;
+    if (typeof delayMinutes === "number") {
+      const delayed = new Date(base.getTime() + delayMinutes * 60_000);
+      await updateMutation.mutateAsync({ id: serviceId, dateTime: delayed });
+      toast({
+        title: "Horário atualizado",
+        description: `Viagem ajustada com +${delayMinutes} min.`,
+      });
+      return;
+    }
+    const initial = isNaN(base.getTime()) ? "" : format(base, "yyyy-MM-dd'T'HH:mm");
+    const nextValue = window.prompt(
+      "Informe a nova data/hora no formato AAAA-MM-DDTHH:mm",
+      initial
+    );
+    if (nextValue == null) return;
+    const parsed = new Date(nextValue);
+    if (isNaN(parsed.getTime())) {
+      toast({
+        title: "Data/Hora inválida",
+        description: "Use o formato AAAA-MM-DDTHH:mm (ex.: 2026-04-20T14:30).",
+        variant: "destructive",
+      });
+      return;
+    }
+    await updateMutation.mutateAsync({ id: serviceId, dateTime: parsed });
+    toast({
+      title: "Horário atualizado",
+      description: "A hora da viagem foi ajustada com sucesso.",
+    });
   }
 
   function openWaze(address: string) {
@@ -370,6 +415,11 @@ export default function AgendaPage() {
             const tripDestination = isReturnItem ? (selectedItem?.destination || s.returnDestination || s.origin) : s.destination;
             const tripDateTime = isReturnItem ? (selectedItem?.dateTime || s.returnDateTime || s.dateTime) : s.dateTime;
             const tripDriver = isReturnItem ? (selectedItem?.driverName || s.driver?.name || "Não atribuído") : (s.driver?.name || "Não atribuído");
+            const tripFlight = String((isReturnItem ? (s.flight || s.returnFlight) : s.flight) || "").trim();
+            const tripKmPrevisto = s.kmPrevisto != null && String(s.kmPrevisto).trim() !== ""
+              ? String(s.kmPrevisto).replace(".", ",")
+              : "";
+            const tripTempoEstimado = String(s.tempoEstimado || "").trim();
             const tripStops = [
               s.stop1,
               s.stop2,
@@ -391,6 +441,7 @@ export default function AgendaPage() {
             const whatsappUrl = buildWhatsappUrl(s.clientPhone);
             const serviceId = s.id;
             const vehicleId = isReturnItem ? (s.returnVehicleId || s.vehicleId) : s.vehicleId;
+            const flightAwareUrl = buildFlightAwareUrl(tripFlight);
             const paxTotal = Number(s.passengers || 0) > 0
               ? Number(s.passengers || 0)
               : Number(s.paxAdt || 0) +
@@ -423,10 +474,47 @@ export default function AgendaPage() {
                     <div><span className="font-semibold text-primary">Cliente:</span> {s.clientName}</div>
                     <div><span className="font-semibold text-primary">Motorista:</span> {tripDriver}</div>
                     <div><span className="font-semibold text-primary">Data/Hora:</span> {format(new Date(tripDateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</div>
+                    <div><span className="font-semibold text-primary">Voo:</span> {tripFlight || "-"}</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {flightAwareUrl ? (
+                        <Button type="button" variant="outline" asChild>
+                          <a href={flightAwareUrl} target="_blank" rel="noreferrer">Consultar voo</a>
+                        </Button>
+                      ) : (
+                        <Button type="button" variant="outline" disabled>
+                          Consultar voo
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={updateMutation.isPending}
+                        onClick={() => adjustTripDateTime(serviceId, tripDateTime)}
+                      >
+                        Definir horário
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button type="button" variant="outline" disabled={updateMutation.isPending} onClick={() => adjustTripDateTime(serviceId, tripDateTime, 15)}>
+                        +15 min
+                      </Button>
+                      <Button type="button" variant="outline" disabled={updateMutation.isPending} onClick={() => adjustTripDateTime(serviceId, tripDateTime, 30)}>
+                        +30 min
+                      </Button>
+                      <Button type="button" variant="outline" disabled={updateMutation.isPending} onClick={() => adjustTripDateTime(serviceId, tripDateTime, 60)}>
+                        +60 min
+                      </Button>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div><span className="font-semibold text-primary">Qtde pax:</span> {paxTotal}</div>
                       <div><span className="font-semibold text-primary">Malas:</span> {bagsCount}</div>
                     </div>
+                    {(tripKmPrevisto || tripTempoEstimado) && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div><span className="font-semibold text-primary">KM da rota:</span> {tripKmPrevisto || "-"}</div>
+                        <div><span className="font-semibold text-primary">Tempo estimado:</span> {tripTempoEstimado || "-"}</div>
+                      </div>
+                    )}
                     {serviceObservation && (
                       <div>
                         <span className="font-semibold text-primary">Observação:</span>{" "}

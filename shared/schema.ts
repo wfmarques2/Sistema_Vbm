@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date, numeric, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date, numeric, decimal, varchar, json, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./models/auth";
@@ -6,12 +6,24 @@ import { relations, sql } from "drizzle-orm";
 
 export * from "./models/auth";
 
+// Session storage usada pelo connect-pg-simple (tabela singular: "session").
+// Mantemos no schema para o drizzle-kit não tentar remover em db:push.
+export const session = pgTable(
+  "session",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: json("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_connect_session_expire").on(table.expire)]
+);
+
 // --- Enums ---
 export const driverTypeEnum = ["fixed", "freelance"] as const;
 export const vehicleStatusEnum = ["available", "in_use", "maintenance"] as const;
 export const vehicleTypeEnum = ["sedan","suv","minivan","van","micro_onibus","onibus","blindado"] as const;
 export const serviceTypeEnum = ["airport", "corporate", "city_tour", "hourly"] as const;
-export const paymentMethodEnum = ["pix", "cash", "credit_card", "debit_card", "saldo"] as const;
+export const paymentMethodEnum = ["pix", "cash", "credit_card", "debit_card", "saldo", "mozio"] as const;
 export const serviceStatusEnum = ["scheduled", "driving_pickup", "pickup_location", "driving_destination", "finished", "canceled"] as const;
 // Status de pagamento para controles financeiros
 export const paymentStatusEnum = ["pending", "paid", "saldo", "partial", "overdue", "canceled", "pay_driver"] as const;
@@ -138,6 +150,8 @@ export const services = pgTable("services", {
   restanteMetodoDriver: text("restante_metodo_driver", { enum: paymentMethodEnum }),
   // Quilometragens previstas/realizadas (decimal), úteis para cálculo de custos.
   kmPrevisto: numeric("km_previsto", { precision: 8, scale: 2 }),
+  // Tempo estimado da viagem (texto livre, ex.: 1h20min).
+  tempoEstimado: text("tempo_estimado"),
   kmReal: numeric("km_real", { precision: 8, scale: 2 }),
   // Custos operacionais em centavos (inteiros) com default 0 para não exigir no insert.
   combustivel: integer("combustivel").default(0).notNull(),

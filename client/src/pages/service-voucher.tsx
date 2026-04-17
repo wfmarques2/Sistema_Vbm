@@ -88,6 +88,7 @@ function paymentLabel(p?: string) {
     s === "cash" ? "Dinheiro" :
     s === "credit_card" ? "Cartão crédito" :
     s === "debit_card" ? "Cartão débito" :
+    s === "mozio" ? "MOZIO" :
     s === "saldo" ? "Saldo (cliente)" : "—";
 }
 
