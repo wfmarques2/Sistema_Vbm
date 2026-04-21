@@ -14,7 +14,7 @@ import { useDrivers } from "@/hooks/use-drivers";
 import { useVehicles } from "@/hooks/use-vehicles";
 import { useClients, useClientDependents, useCreateClient, useCreateClientDependent } from "@/hooks/use-clients";
 import { useRoute, useLocation } from "wouter";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -34,6 +34,7 @@ export default function ServiceEditPage() {
   const deleteMutation = useDeleteService();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const submitLockRef = useRef(false);
   const [returnServiceId, setReturnServiceId] = useState<number | null>(null);
   const [currentIsReturnService, setCurrentIsReturnService] = useState(false);
 
@@ -278,6 +279,10 @@ export default function ServiceEditPage() {
   }, [selectedClientId, clients]);
 
   const onSubmit = async (values: any) => {
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
+    setSaving(true);
+
     const raw = values.value;
     const normalized = (() => {
       if (typeof raw === "number") return raw.toFixed(2);
@@ -413,7 +418,6 @@ export default function ServiceEditPage() {
     };
 
     try {
-      setSaving(true);
       toast({ title: isEdit ? "Atualizando serviço" : "Criando serviço", description: "Enviando dados..." });
       let mainService: any;
       if (isEdit && id) {
@@ -478,6 +482,7 @@ export default function ServiceEditPage() {
       });
     } finally {
       setSaving(false);
+      submitLockRef.current = false;
     }
   };
 
@@ -525,8 +530,8 @@ export default function ServiceEditPage() {
     : "";
   const returnRouteAndKmUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(returnRouteOrigin)}&destination=${encodeURIComponent(returnRouteDestination)}${returnRouteWaypointsParam}&travelmode=driving`;
   const flightCode = String(form.watch("flight") || "").replace(/\s+/g, "").toUpperCase();
-  const flightAwareUrl = flightCode
-    ? `https://pt.flightaware.com/live/flight/${encodeURIComponent(flightCode)}`
+  const flightSearchUrl = flightCode
+    ? `https://www.google.com/search?q=${encodeURIComponent(`voo ${flightCode}`)}`
     : "";
 
   return (
@@ -711,10 +716,10 @@ export default function ServiceEditPage() {
                 <Button
                   type="button"
                   variant="secondary"
-                  disabled={!flightAwareUrl}
+                  disabled={!flightSearchUrl}
                   onClick={() => {
-                    if (!flightAwareUrl) return;
-                    window.open(flightAwareUrl, "_blank", "noopener,noreferrer");
+                    if (!flightSearchUrl) return;
+                    window.open(flightSearchUrl, "_blank", "noopener,noreferrer");
                   }}
                 >
                   Consultar voo
@@ -1236,7 +1241,11 @@ export default function ServiceEditPage() {
             <Button
               type="button"
               className="w-full"
-              onClick={() => form.handleSubmit(onSubmit, onInvalid)()}
+              disabled={saving}
+              onClick={() => {
+                if (saving || submitLockRef.current) return;
+                form.handleSubmit(onSubmit, onInvalid)();
+              }}
             >
               {isEdit ? "Atualizar Serviço" : "Criar Serviço"}
             </Button>

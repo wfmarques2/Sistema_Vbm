@@ -123,10 +123,10 @@ export default function AgendaPage() {
     return `https://waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`;
   }
 
-  function buildFlightAwareUrl(flight?: string | null): string | null {
+  function buildFlightSearchUrl(flight?: string | null): string | null {
     const code = String(flight || "").replace(/\s+/g, "").toUpperCase();
     if (!code) return null;
-    return `https://pt.flightaware.com/live/flight/${encodeURIComponent(code)}`;
+    return `https://www.google.com/search?q=${encodeURIComponent(`voo ${code}`)}`;
   }
 
   async function adjustTripDateTime(
@@ -441,7 +441,7 @@ export default function AgendaPage() {
             const whatsappUrl = buildWhatsappUrl(s.clientPhone);
             const serviceId = s.id;
             const vehicleId = isReturnItem ? (s.returnVehicleId || s.vehicleId) : s.vehicleId;
-            const flightAwareUrl = buildFlightAwareUrl(tripFlight);
+            const flightSearchUrl = buildFlightSearchUrl(tripFlight);
             const paxTotal = Number(s.passengers || 0) > 0
               ? Number(s.passengers || 0)
               : Number(s.paxAdt || 0) +
@@ -476,9 +476,9 @@ export default function AgendaPage() {
                     <div><span className="font-semibold text-primary">Data/Hora:</span> {format(new Date(tripDateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</div>
                     <div><span className="font-semibold text-primary">Voo:</span> {tripFlight || "-"}</div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {flightAwareUrl ? (
+                      {flightSearchUrl ? (
                         <Button type="button" variant="outline" asChild>
-                          <a href={flightAwareUrl} target="_blank" rel="noreferrer">Consultar voo</a>
+                          <a href={flightSearchUrl} target="_blank" rel="noreferrer">Consultar voo</a>
                         </Button>
                       ) : (
                         <Button type="button" variant="outline" disabled>
