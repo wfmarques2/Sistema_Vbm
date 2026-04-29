@@ -105,6 +105,7 @@ export default function ServiceVoucherPage() {
   
   const t = translations[lang];
   const dateLocale = lang === "pt" ? ptBR : es;
+  const numberLocale = lang === "pt" ? "pt-BR" : "es-ES";
   const search = new URLSearchParams(window.location.search);
   const getOverride = (key: string): number | undefined => {
     const v = search.get(key);
@@ -432,8 +433,8 @@ export default function ServiceVoucherPage() {
                      service.statusPagamento === "partial" ? (() => {
                        const pago = Number(service.valorPagoParcial || 0);
                        const restanteCents = Math.max(0, Number(service.valorCobrado || 0) - pago);
-                       const restanteFmt = (restanteCents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                       const pagoFmt = (pago / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                       const restanteFmt = (restanteCents / 100).toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                       const pagoFmt = (pago / 100).toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                        const restoMetodo =
                          service.restanteMetodo === "pay_driver"
                            ? `ao motorista${service.restanteMetodoDriver ? ` (${paymentLabel(service.restanteMetodoDriver)})` : ""}`
@@ -480,7 +481,7 @@ export default function ServiceVoucherPage() {
                   <span className="text-neutral-600">{t.totalToCollect}:</span>
                   {(() => {
                     const toCurrency = (cents: number) =>
-                      (cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      (cents / 100).toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     const valorCobradoCents = (() => {
                       const vc = Number(service.valorCobrado || 0);
                       if (vc > 0) return vc;

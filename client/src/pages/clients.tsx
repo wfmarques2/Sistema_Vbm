@@ -33,11 +33,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { format, type Locale } from "date-fns";
+import { es, ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
+import { useI18n } from "@/lib/i18n";
 
 export default function ClientsPage() {
+  const { language, t } = useI18n();
+  const numberLocale = language === "es" ? "es-ES" : "pt-BR";
+  const dateLocale = language === "es" ? es : ptBR;
   const { data: clients, isLoading } = useClients();
   const { data: services } = useServices();
   const createMutation = useCreateClient();
@@ -90,7 +94,7 @@ export default function ClientsPage() {
     setEditingId(client.id);
     form.reset(client);
     const amount = ((client.balanceCentavos ?? 0) / 100);
-    setSaldoDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+    setSaldoDisplay(amount.toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
     setIsDialogOpen(true);
   };
 
@@ -104,20 +108,20 @@ export default function ClientsPage() {
     <Layout>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Clientes</h2>
-          <p className="text-muted-foreground">Cadastre e gerencie seus clientes.</p>
+          <h2 className="text-3xl font-display font-bold text-primary">{t("clients.title")}</h2>
+          <p className="text-muted-foreground">{t("clients.subtitle")}</p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => { setEditingId(null); form.reset(); }} className="bg-primary shadow-lg hover:shadow-primary/30">
               <Plus className="w-4 h-4 mr-2" />
-              Adicionar Cliente
+              {t("clients.add")}
             </Button>
           </DialogTrigger>
           <DialogContent className={editingId ? "w-full max-w-5xl" : "w-full max-w-3xl"}>
             <DialogHeader>
-              <DialogTitle>{editingId ? "Editar Cliente" : "Adicionar Cliente"}</DialogTitle>
+              <DialogTitle>{editingId ? t("clients.edit") : t("clients.add")}</DialogTitle>
             </DialogHeader>
             
             <div className={editingId ? "grid grid-cols-1 md:grid-cols-2 gap-6" : "max-w-2xl mx-auto"}>
@@ -216,12 +220,12 @@ export default function ClientsPage() {
                           const digits = e.target.value.replace(/\D/g, "");
                           const cents = digits ? parseInt(digits, 10) : 0;
                           const amount = cents / 100;
-                          setSaldoDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                          setSaldoDisplay(amount.toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
                         }}
                       />
                     </div>
                     <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
-                      {editingId ? "Atualizar Cliente" : "Criar Cliente"}
+                      {editingId ? t("clients.update") : t("clients.create")}
                     </Button>
                   </form>
                 </Form>
@@ -255,14 +259,14 @@ export default function ClientsPage() {
               <TableHead>Saldo</TableHead>
               <TableHead>Dependentes</TableHead>
               <TableHead>Viagens Concluídas</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+              <TableHead className="text-right">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-               <TableRow><TableCell colSpan={7} className="text-center py-8">Carregando clientes...</TableCell></TableRow>
+               <TableRow><TableCell colSpan={7} className="text-center py-8">{t("clients.loading")}</TableCell></TableRow>
             ) : clients?.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">{t("clients.empty")}</TableCell></TableRow>
             ) : (
               clients?.map((client) => (
                 <TableRow key={client.id} className="group hover:bg-muted/30 transition-colors">
@@ -281,7 +285,7 @@ export default function ClientsPage() {
                   </TableCell>
                   <TableCell>{client.nationality || "—"}</TableCell>
                   <TableCell>
-                    {(client.balanceCentavos ? client.balanceCentavos / 100 : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    {(client.balanceCentavos ? client.balanceCentavos / 100 : 0).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
@@ -295,7 +299,7 @@ export default function ClientsPage() {
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-1">
                           <MoreHorizontal className="w-4 h-4" />
-                          Ações
+                          {t("common.actions")}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -309,7 +313,7 @@ export default function ClientsPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDelete(client.id)}>
                           <Trash2 className="w-4 h-4 text-red-600" />
-                          Excluir
+                          {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -328,12 +332,19 @@ export default function ClientsPage() {
       >
         <DialogContent className="w-full max-w-6xl max-h-[88vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Histórico de corridas do cliente</DialogTitle>
+            <DialogTitle>{t("clients.historyTitle")}</DialogTitle>
           </DialogHeader>
           {(() => {
             const selected = (clients || []).find((c) => c.id === historyClientId);
             if (!selected) return <div className="text-muted-foreground">Selecione um cliente.</div>;
-            return <ClientRideHistory client={selected} services={services || []} />;
+            return (
+              <ClientRideHistory
+                client={selected}
+                services={services || []}
+                dateLocale={dateLocale}
+                numberLocale={numberLocale}
+              />
+            );
           })()}
         </DialogContent>
       </Dialog>
@@ -367,7 +378,17 @@ function splitPassengerNames(name: string) {
     .filter(Boolean);
 }
 
-function ClientRideHistory({ client, services }: { client: any; services: any[] }) {
+function ClientRideHistory({
+  client,
+  services,
+  dateLocale,
+  numberLocale,
+}: {
+  client: any;
+  services: any[];
+  dateLocale: Locale;
+  numberLocale: string;
+}) {
   const { data: dependents } = useClientDependents(client.id);
 
   const dependentNames = useMemo(() => {
@@ -404,7 +425,7 @@ function ClientRideHistory({ client, services }: { client: any; services: any[] 
       const hasDependent = splitPassengerNames(String(s.clientName || "")).some((n) => dependentNames.has(n.toLowerCase()));
       const cents = Number(s.valorCobrado || 0) > 0 ? Number(s.valorCobrado || 0) : Math.round(Number(s.value || 0) * 100);
       return {
-        "Data/Hora": format(new Date(s.dateTime), "dd/MM/yyyy HH:mm", { locale: ptBR }),
+        "Data/Hora": format(new Date(s.dateTime), "dd/MM/yyyy HH:mm", { locale: dateLocale }),
         "Passageiro(s)": passengers || s.clientName || "-",
         "Perfil de Passageiro": hasDependent ? "Inclui dependente" : "Titular",
         "Origem": s.origin || "-",
@@ -459,7 +480,7 @@ function ClientRideHistory({ client, services }: { client: any; services: any[] 
         <div className="rounded-lg border border-border p-3 bg-muted/20">
           <div className="text-xs text-muted-foreground">Valor total</div>
           <div className="text-xl font-semibold">
-            {(totalValorCentavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            {(totalValorCentavos / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}
           </div>
         </div>
       </div>
@@ -490,7 +511,7 @@ function ClientRideHistory({ client, services }: { client: any; services: any[] 
                 const cents = Number(s.valorCobrado || 0) > 0 ? Number(s.valorCobrado || 0) : Math.round(Number(s.value || 0) * 100);
                 return (
                   <TableRow key={s.id}>
-                    <TableCell>{format(new Date(s.dateTime), "dd/MM/yyyy HH:mm", { locale: ptBR })}</TableCell>
+                    <TableCell>{format(new Date(s.dateTime), "dd/MM/yyyy HH:mm", { locale: dateLocale })}</TableCell>
                     <TableCell>
                       <div className="font-medium">{passengers.join(", ") || s.clientName}</div>
                       <div className="mt-1">
@@ -506,7 +527,7 @@ function ClientRideHistory({ client, services }: { client: any; services: any[] 
                     <TableCell>{paymentLabel(String(s.formaPagamento || s.paymentMethod || ""))}</TableCell>
                     <TableCell>{s.driver?.name || "Não atribuído"}</TableCell>
                     <TableCell className="text-right">
-                      {(cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      {(cents / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}
                     </TableCell>
                   </TableRow>
                 );

@@ -12,8 +12,13 @@ import { useVehicles } from "@/hooks/use-vehicles";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateQuickFilters } from "@/components/date-quick-filters";
+import { useI18n } from "@/lib/i18n";
+
+const getCurrentLocale = () =>
+  typeof document !== "undefined" && document.documentElement.lang === "es" ? "es-ES" : "pt-BR";
 
 export default function FinanceExpensesListPage() {
+  const { t } = useI18n();
   const createUnified = useCreateUnifiedExpense();
   const { data: drivers } = useDrivers();
   const { data: vehicles } = useVehicles();
@@ -21,13 +26,13 @@ export default function FinanceExpensesListPage() {
   return (
     <Layout>
       <div className="mb-8">
-        <h2 className="text-3xl font-display font-bold text-primary">Central de Despesas</h2>
-        <p className="text-muted-foreground">Cadastro e listagem unificada de todas as despesas.</p>
+        <h2 className="text-3xl font-display font-bold text-primary">{t("financeExpensesList.title")}</h2>
+        <p className="text-muted-foreground">{t("financeExpensesList.subtitle")}</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Cadastrar Despesa</CardTitle>
+          <CardTitle>{t("financeExpensesList.add")}</CardTitle>
         </CardHeader>
         <CardContent>
           <UnifiedExpenseCreate drivers={drivers} vehicles={vehicles} createUnified={createUnified} />
@@ -36,7 +41,7 @@ export default function FinanceExpensesListPage() {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Listagem Unificada</CardTitle>
+          <CardTitle>{t("financeExpensesList.list")}</CardTitle>
         </CardHeader>
         <CardContent>
           <UnifiedExpensesTab />
@@ -67,7 +72,7 @@ function CompanyExpenseRow({
   const [categoria, setCategoria] = useState(expense.categoria);
   const [descricao, setDescricao] = useState(expense.descricao || "");
   const [pagoPara, setPagoPara] = useState(expense.pagoPara || "");
-  const [valorDisplay, setValorDisplay] = useState((expense.valorCentavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+  const [valorDisplay, setValorDisplay] = useState((expense.valorCentavos / 100).toLocaleString(getCurrentLocale(), { style: "currency", currency: "BRL" }));
   const [data, setData] = useState(expense.ocorridaEm?.slice(0, 10) || "");
   return (
     <TableRow className={!expense.active ? "opacity-50" : ""}>
@@ -92,7 +97,7 @@ function CompanyExpenseRow({
             const digits = e.target.value.replace(/\D/g, "");
             const cents = digits ? parseInt(digits, 10) : 0;
             const amount = cents / 100;
-            setValorDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+            setValorDisplay(amount.toLocaleString(getCurrentLocale(), { style: "currency", currency: "BRL" }));
           }}
           className="w-32"
         />
@@ -149,7 +154,7 @@ function VehicleExpenseRow({
   const [serviceId, setServiceId] = useState(expense.serviceId || 0);
   const [categoria, setCategoria] = useState(expense.categoria);
   const [descricao, setDescricao] = useState(expense.descricao || "");
-  const [valorDisplay, setValorDisplay] = useState((expense.valorCentavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+  const [valorDisplay, setValorDisplay] = useState((expense.valorCentavos / 100).toLocaleString(getCurrentLocale(), { style: "currency", currency: "BRL" }));
   const [data, setData] = useState(expense.ocorridaEm?.slice(0, 10) || "");
   return (
     <TableRow className={!expense.active ? "opacity-50" : ""}>
@@ -174,7 +179,7 @@ function VehicleExpenseRow({
             const digits = e.target.value.replace(/\D/g, "");
             const cents = digits ? parseInt(digits, 10) : 0;
             const amount = cents / 100;
-            setValorDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+            setValorDisplay(amount.toLocaleString(getCurrentLocale(), { style: "currency", currency: "BRL" }));
           }}
           className="w-32"
         />
@@ -227,20 +232,9 @@ function UnifiedExpensesTab() {
   const [uLimit, setULimit] = useState<number>(50);
   const [uOffset, setUOffset] = useState<number>(0);
   const [uSortOrder, setUSortOrder] = useState<"asc"|"desc">("desc");
-  const monthOptions = [
-    "Janeiro",
-    "Fevereiro",
-    "Março",
-    "Abril",
-    "Maio",
-    "Junho",
-    "Julho",
-    "Agosto",
-    "Setembro",
-    "Outubro",
-    "Novembro",
-    "Dezembro",
-  ];
+  const monthOptions = Array.from({ length: 12 }, (_, month) =>
+    new Date(2026, month, 1).toLocaleString(getCurrentLocale(), { month: "long" })
+  );
   const toDateInput = (d: Date) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -382,7 +376,7 @@ function UnifiedRowWithDelete({ r, onDeleted }: { r: any; onDeleted: () => void 
       <TableCell>
         {r.tipo === "vehicle" ? "Veículo" : r.tipo === "company" ? "Empresa" : r.tipo === "driver_payment" ? "Motorista" : "Serviço"}
       </TableCell>
-      <TableCell>{new Date(r.ocorridaEm).toLocaleDateString("pt-BR")}</TableCell>
+      <TableCell>{new Date(r.ocorridaEm).toLocaleDateString(getCurrentLocale())}</TableCell>
       <TableCell>
         {"categoria" in r ? r.categoria : "observacao" in r ? (r.observacao || "-") : "-"}
       </TableCell>
@@ -437,7 +431,7 @@ function UnifiedRowWithDelete({ r, onDeleted }: { r: any; onDeleted: () => void 
           </div>
         )}
       </TableCell>
-      <TableCell>{(r.valorCentavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
+      <TableCell>{(r.valorCentavos / 100).toLocaleString(getCurrentLocale(), { style: "currency", currency: "BRL" })}</TableCell>
       <TableCell className="text-right">
         {r.tipo === "service" ? (
           <Button variant="ghost" size="icon" disabled title="Edite custos no serviço">
@@ -511,7 +505,7 @@ function UnifiedExpenseCreate({ drivers, vehicles, createUnified }: { drivers: a
               const digits = e.target.value.replace(/\D/g, "");
               const cents = digits ? parseInt(digits, 10) : 0;
               const amount = cents / 100;
-              setValorDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+              setValorDisplay(amount.toLocaleString(getCurrentLocale(), { style: "currency", currency: "BRL" }));
             }}
             placeholder="Valor"
           />
@@ -537,7 +531,7 @@ function UnifiedExpenseCreate({ drivers, vehicles, createUnified }: { drivers: a
               const digits = e.target.value.replace(/\D/g, "");
               const cents = digits ? parseInt(digits, 10) : 0;
               const amount = cents / 100;
-              setValorDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+              setValorDisplay(amount.toLocaleString(getCurrentLocale(), { style: "currency", currency: "BRL" }));
             }}
             placeholder="Valor"
           />
@@ -583,7 +577,7 @@ function UnifiedExpenseCreate({ drivers, vehicles, createUnified }: { drivers: a
               const digits = e.target.value.replace(/\D/g, "");
               const cents = digits ? parseInt(digits, 10) : 0;
               const amount = cents / 100;
-              setValorDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+              setValorDisplay(amount.toLocaleString(getCurrentLocale(), { style: "currency", currency: "BRL" }));
             }}
             placeholder="Valor"
           />

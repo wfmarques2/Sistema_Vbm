@@ -4,8 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useCreateVehicleExpense, useCreateCompanyExpense, useUpdateServiceExpenses } from "@/hooks/use-financial";
+import { useI18n } from "@/lib/i18n";
 
 export default function FinanceExpensesCreatePage() {
+  const { language, t } = useI18n();
+  const locale = language === "es" ? "es-ES" : "pt-BR";
   const [vehicleId, setVehicleId] = useState<number | "">("");
   const [serviceId, setServiceId] = useState<number | "">("");
   const [categoria, setCategoria] = useState("");
@@ -27,8 +30,8 @@ export default function FinanceExpensesCreatePage() {
   return (
     <Layout>
       <div className="mb-8">
-        <h2 className="text-3xl font-display font-bold text-primary">Cadastro de Despesas</h2>
-        <p className="text-muted-foreground">Registre despesas de viagem, veículo e gerais.</p>
+        <h2 className="text-3xl font-display font-bold text-primary">{t("financeExpensesCreate.title")}</h2>
+        <p className="text-muted-foreground">{t("financeExpensesCreate.subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -48,7 +51,7 @@ export default function FinanceExpensesCreatePage() {
                 const digits = e.target.value.replace(/\D/g, "");
                 const cents = digits ? parseInt(digits, 10) : 0;
                 const amount = cents / 100;
-                setValorDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                setValorDisplay(amount.toLocaleString(locale, { style: "currency", currency: "BRL" }));
               }}
             />
             <Input placeholder="Descrição" value={descricao} onChange={(e) => setDescricao(e.target.value)} />
@@ -91,7 +94,7 @@ export default function FinanceExpensesCreatePage() {
                 const digits = e.target.value.replace(/\D/g, "");
                 const cents = digits ? parseInt(digits, 10) : 0;
                 const amount = cents / 100;
-                setValorDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                setValorDisplay(amount.toLocaleString(locale, { style: "currency", currency: "BRL" }));
               }}
             />
             <Input placeholder="Descrição" value={descricao} onChange={(e) => setDescricao(e.target.value)} />
@@ -145,7 +148,7 @@ export default function FinanceExpensesCreatePage() {
                 const digits = e.target.value.replace(/\D/g, "");
                 const cents = digits ? parseInt(digits, 10) : 0;
                 const amount = cents / 100;
-                setCombDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                setCombDisplay(amount.toLocaleString(locale, { style: "currency", currency: "BRL" }));
               }}
             />
             <Input
@@ -156,7 +159,7 @@ export default function FinanceExpensesCreatePage() {
                 const digits = e.target.value.replace(/\D/g, "");
                 const cents = digits ? parseInt(digits, 10) : 0;
                 const amount = cents / 100;
-                setPedDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                setPedDisplay(amount.toLocaleString(locale, { style: "currency", currency: "BRL" }));
               }}
             />
             <Input
@@ -167,7 +170,7 @@ export default function FinanceExpensesCreatePage() {
                 const digits = e.target.value.replace(/\D/g, "");
                 const cents = digits ? parseInt(digits, 10) : 0;
                 const amount = cents / 100;
-                setEstacDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                setEstacDisplay(amount.toLocaleString(locale, { style: "currency", currency: "BRL" }));
               }}
             />
             <Input
@@ -178,7 +181,7 @@ export default function FinanceExpensesCreatePage() {
                 const digits = e.target.value.replace(/\D/g, "");
                 const cents = digits ? parseInt(digits, 10) : 0;
                 const amount = cents / 100;
-                setAlimDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                setAlimDisplay(amount.toLocaleString(locale, { style: "currency", currency: "BRL" }));
               }}
             />
             <Input
@@ -189,7 +192,7 @@ export default function FinanceExpensesCreatePage() {
                 const digits = e.target.value.replace(/\D/g, "");
                 const cents = digits ? parseInt(digits, 10) : 0;
                 const amount = cents / 100;
-                setOutrosDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                setOutrosDisplay(amount.toLocaleString(locale, { style: "currency", currency: "BRL" }));
               }}
             />
             <Button

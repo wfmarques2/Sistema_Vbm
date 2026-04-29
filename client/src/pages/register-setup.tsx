@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useRegisterSetup } from "@/hooks/use-users";
+import { useI18n } from "@/lib/i18n";
 
 const setupSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -19,6 +20,7 @@ const setupSchema = z.object({
 });
 
 export default function RegisterSetupPage() {
+  const { t } = useI18n();
   const [_, setLocation] = useLocation();
   const registerSetupMutation = useRegisterSetup();
 
@@ -47,9 +49,9 @@ export default function RegisterSetupPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Primeiro Acesso</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">{t("registerSetup.title")}</CardTitle>
           <CardDescription className="text-center">
-            Informe seu email cadastrado e defina sua senha de acesso
+            {t("registerSetup.subtitle")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -99,13 +101,13 @@ export default function RegisterSetupPage() {
                 className="w-full" 
                 disabled={registerSetupMutation.isPending}
               >
-                {registerSetupMutation.isPending ? "Registrando..." : "Registrar Senha"}
+                {registerSetupMutation.isPending ? t("registerSetup.registering") : t("registerSetup.registerPassword")}
               </Button>
 
               <div className="mt-4 text-center text-sm">
                 <span className="text-muted-foreground">Já tem senha? </span>
                 <Button variant="ghost" className="p-0" onClick={() => setLocation("/login")}>
-                  Fazer Login
+                  {t("registerSetup.login")}
                 </Button>
               </div>
             </form>

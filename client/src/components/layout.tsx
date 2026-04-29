@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { Sun, Moon } from "lucide-react";
 import vbmLogoDarkUrl from "@assets/vbm-logo-1.png?url";
 import vbmLogoLightUrl from "@assets/vbm-logo-2.png?url";
+import { useI18n } from "@/lib/i18n";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -27,6 +28,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const { language, setLanguage, t } = useI18n();
   const [financeOpen, setFinanceOpen] = useState(location.startsWith("/finance/"));
   const [servicesOpen, setServicesOpen] = useState(
     location === "/services" ||
@@ -36,22 +38,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 
   const navigation = [
-    { name: "Painel", href: "/", icon: LayoutDashboard },
-    { name: "Clientes", href: "/clients", icon: Users },
-    { name: "Motoristas", href: "/drivers", icon: Users },
-    { name: "Veículos", href: "/vehicles", icon: Car },
+    { name: t("layout.dashboard"), href: "/", icon: LayoutDashboard },
+    { name: t("layout.clients"), href: "/clients", icon: Users },
+    { name: t("layout.drivers"), href: "/drivers", icon: Users },
+    { name: t("layout.vehicles"), href: "/vehicles", icon: Car },
   ];
   const servicesNavigation = [
-    { name: "Serviços", href: "/services", icon: FileText },
-    { name: "Agenda", href: "/agenda", icon: CalendarDays },
-    { name: "Relatórios", href: "/reports", icon: FileText },
+    { name: t("layout.services"), href: "/services", icon: FileText },
+    { name: t("layout.agenda"), href: "/agenda", icon: CalendarDays },
+    { name: t("layout.reports"), href: "/reports", icon: FileText },
   ];
   const financeNavigation = [
-    { name: "Despesas", href: "/finance/expenses", icon: FileText },
-    { name: "Receitas", href: "/finance/revenues", icon: FileText },
-    { name: "Relatórios", href: "/finance/reports", icon: FileText },
-    { name: "Agenda", href: "/finance/agenda", icon: CalendarDays },
-    { name: "Painel Financeiro", href: "/finance/dashboard", icon: LayoutDashboard },
+    { name: t("layout.expenses"), href: "/finance/expenses", icon: FileText },
+    { name: t("layout.revenues"), href: "/finance/revenues", icon: FileText },
+    { name: t("layout.financeReports"), href: "/finance/reports", icon: FileText },
+    { name: t("layout.financeAgenda"), href: "/finance/agenda", icon: CalendarDays },
+    { name: t("layout.financeDashboard"), href: "/finance/dashboard", icon: LayoutDashboard },
   ];
 
   useEffect(() => {
@@ -86,7 +88,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               alt="VBM Transfer Executivo"
               className="w-32 h-32 object-contain"
             />
-            <h1 className="mt-3 text-2xl font-display font-bold text-primary text-center">Painel Administrativo</h1>
+            <h1 className="mt-3 text-2xl font-display font-bold text-primary text-center">{t("layout.adminPanel")}</h1>
           </div>
 
           <nav className="flex-1 p-4 space-y-1">
@@ -107,8 +109,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {(() => {
               const currentServicesNav = user?.role === "driver"
                 ? [
-                    { name: "Agenda", href: "/agenda", icon: CalendarDays },
-                    { name: "Histórico", href: "/driver/history", icon: FileText },
+                    { name: t("layout.agenda"), href: "/agenda", icon: CalendarDays },
+                    { name: t("layout.history"), href: "/driver/history", icon: FileText },
                   ]
                 : servicesNavigation;
               const servicesActive = currentServicesNav.some((i) => location === i.href);
@@ -119,7 +121,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     onClick={() => setServicesOpen((o) => !o)}
                   >
                     <FileText className="w-5 h-5" />
-                    <span>Serviços</span>
+                    <span>{t("layout.services")}</span>
                     <ChevronDown className={`w-4 h-4 ml-auto transition-transform ${servicesOpen ? "rotate-180" : ""}`} />
                   </div>
                   {servicesOpen && (
@@ -151,7 +153,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     onClick={() => setFinanceOpen((o) => !o)}
                   >
                     <FileText className="w-5 h-5" />
-                    <span>Financeiro</span>
+                    <span>{t("layout.finance")}</span>
                     <ChevronDown className={`w-4 h-4 ml-auto transition-transform ${financeOpen ? "rotate-180" : ""}`} />
                   </div>
                   {financeOpen && (
@@ -197,7 +199,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="mb-4 flex items-center justify-between px-3 py-2 bg-secondary/30 rounded-lg mx-2">
               <div className="flex items-center gap-2">
                 {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                <span className="text-sm font-medium">Tema</span>
+                <span className="text-sm font-medium">{t("common.theme")}</span>
               </div>
               <Switch
                 checked={theme === "dark"}
@@ -205,13 +207,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 className="data-[state=checked]:bg-primary"
               />
             </div>
+            <div className="mb-4 flex items-center justify-between px-3 py-2 bg-secondary/30 rounded-lg mx-2 gap-3">
+              <span className="text-sm font-medium">{t("common.language")}</span>
+              <select
+                className="bg-background border border-border rounded px-2 py-1 text-sm"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value === "es" ? "es" : "pt-BR")}
+              >
+                <option value="pt-BR">{t("common.portuguese")}</option>
+                <option value="es">{t("common.spanish")}</option>
+              </select>
+            </div>
             <Button 
               variant="outline" 
               className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={() => logout()}
             >
               <LogOut className="w-4 h-4 mr-2" />
-              Sair
+              {t("common.logout")}
             </Button>
           </div>
         </div>

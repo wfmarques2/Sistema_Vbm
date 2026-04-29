@@ -13,28 +13,24 @@ import { useDrivers } from "@/hooks/use-drivers";
 import { saveAs } from "file-saver";
 import vbmLogoLightUrl from "@assets/vbm-logo-2.png?url";
 import { Filter } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export default function FinanceReportsPage() {
+  const { language, t } = useI18n();
+  const locale = language === "es" ? "es-ES" : "pt-BR";
   const [start, setStart] = useState<string>("");
   const [end, setEnd] = useState<string>("");
   const [vehicleId, setVehicleId] = useState<number | "">("");
   const [driverId, setDriverId] = useState<number | "">("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterMonth, setFilterMonth] = useState<string>("all");
-  const monthOptions = [
-    "Janeiro",
-    "Fevereiro",
-    "Março",
-    "Abril",
-    "Maio",
-    "Junho",
-    "Julho",
-    "Agosto",
-    "Setembro",
-    "Outubro",
-    "Novembro",
-    "Dezembro",
-  ];
+  const monthOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, month) =>
+        new Date(2026, month, 1).toLocaleString(locale, { month: "long" })
+      ),
+    [locale]
+  );
   const toDateInput = (d: Date) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -146,7 +142,7 @@ export default function FinanceReportsPage() {
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 12;
     const contentWidth = pageWidth - margin * 2;
-    const dtStr = new Date().toLocaleString("pt-BR");
+    const dtStr = new Date().toLocaleString(locale);
     let y = margin;
     let pageNo = 1;
     const fmt = (v: number) => `R$${(v / 100).toFixed(2)}`;
@@ -251,7 +247,7 @@ export default function FinanceReportsPage() {
     };
     drawHeaderRow();
     const rows = consolidatedServices.map((s: any) => ({
-      data: new Date(s.dateTime).toLocaleDateString("pt-BR"),
+      data: new Date(s.dateTime).toLocaleDateString(locale),
       cliente: String(s.clientName || "-"),
       origem: String(s.origin || "-"),
       destino: String(s.destination || "-"),
@@ -370,7 +366,7 @@ export default function FinanceReportsPage() {
       const valorCobrado = Number(s.receitaConsolidadaCentavos || 0);
       const lucroBruto = valorCobrado - custoTotal;
       servicosWs.addRow({
-        dataHora: new Date(s.dateTime).toLocaleString("pt-BR"),
+        dataHora: new Date(s.dateTime).toLocaleString(locale),
         cliente: String(s.clientName || "-"),
         origem: String(s.origin || "-"),
         destino: String(s.destination || "-"),
@@ -398,7 +394,7 @@ export default function FinanceReportsPage() {
       despesasWs.addRow({
         id: r.id,
         tipo: r.tipo === "vehicle" ? "Veículo" : r.tipo === "company" ? "Empresa" : "Motorista",
-        data: new Date(r.ocorridaEm).toLocaleString("pt-BR"),
+        data: new Date(r.ocorridaEm).toLocaleString(locale),
         descricao: "categoria" in r ? r.categoria : "observacao" in r ? r.observacao || "-" : "-",
         centro:
           "vehicleId" in r && r.vehicleId
@@ -423,8 +419,8 @@ export default function FinanceReportsPage() {
     <Layout>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Relatórios Financeiros</h2>
-          <p className="text-muted-foreground">Resumo por período com custo médio por km.</p>
+          <h2 className="text-3xl font-display font-bold text-primary">{t("financeReports.title")}</h2>
+          <p className="text-muted-foreground">{t("financeReports.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <div className="min-w-44">
@@ -456,10 +452,10 @@ export default function FinanceReportsPage() {
           </div>
           <Button variant="outline" className="gap-2" onClick={() => setShowFilters((s) => !s)}>
             <Filter className="w-4 h-4" />
-            {showFilters ? "Ocultar filtros" : "Filtros"}
+            {showFilters ? t("finance.common.hideFilters") : t("finance.common.filters")}
           </Button>
-          <Button variant="secondary" onClick={exportPdf} disabled={!enabled || isLoading}>Exportar PDF</Button>
-          <Button variant="secondary" onClick={exportExcel} disabled={!enabled || isLoading}>Exportar Excel</Button>
+          <Button variant="secondary" onClick={exportPdf} disabled={!enabled || isLoading}>{t("finance.common.exportPdf")}</Button>
+          <Button variant="secondary" onClick={exportExcel} disabled={!enabled || isLoading}>{t("finance.common.exportExcel")}</Button>
         </div>
       </div>
 
@@ -467,7 +463,7 @@ export default function FinanceReportsPage() {
       {showFilters && (
       <Card>
         <CardHeader>
-          <CardTitle>Filtros</CardTitle>
+          <CardTitle>{t("finance.common.filters")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <DateQuickFilters
@@ -508,7 +504,7 @@ export default function FinanceReportsPage() {
         </CardHeader>
         <CardContent>
           {!enabled && <div className="text-muted-foreground">Selecione período para gerar relatório.</div>}
-          {isLoading && <div className="text-muted-foreground">Carregando...</div>}
+          {isLoading && <div className="text-muted-foreground">{t("finance.common.loading")}</div>}
           {isError && <div className="text-destructive">Erro ao gerar relatório.</div>}
           {report && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -599,7 +595,7 @@ export default function FinanceReportsPage() {
         </CardHeader>
         <CardContent>
           {!enabled && <div className="text-muted-foreground">Informe início e fim para listar.</div>}
-          {isLoadingServices && <div className="text-muted-foreground">Carregando serviços...</div>}
+          {isLoadingServices && <div className="text-muted-foreground">{t("services.loading")}</div>}
           {isErrorServices && <div className="text-destructive">Erro ao carregar serviços.</div>}
           {consolidatedServices.length > 0 && (
             <Table>
@@ -643,7 +639,7 @@ export default function FinanceReportsPage() {
         </CardHeader>
         <CardContent>
           {!enabled && <div className="text-muted-foreground">Informe início e fim para listar.</div>}
-          {isLoadingExpenses && <div className="text-muted-foreground">Carregando despesas...</div>}
+          {isLoadingExpenses && <div className="text-muted-foreground">{t("finance.common.loading")}</div>}
           {isErrorExpenses && <div className="text-destructive">Erro ao carregar despesas.</div>}
           {expenses && (
             <Table>
@@ -669,7 +665,7 @@ export default function FinanceReportsPage() {
                         "driverId" in r && (r as any).driverId ? `Motorista #${(r as any).driverId}` :
                         "serviceId" in r && (r as any).serviceId ? `Serviço #${(r as any).serviceId}` : "-"}
                     </TableCell>
-                    <TableCell>{(r.valorCentavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
+                    <TableCell>{(r.valorCentavos / 100).toLocaleString(locale, { style: "currency", currency: "BRL" })}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

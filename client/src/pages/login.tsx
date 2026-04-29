@@ -11,10 +11,12 @@ import { Switch } from "@/components/ui/switch";
 import { Moon, Sun } from "lucide-react";
 import vbmLogoDarkUrl from "@assets/vbm-logo-1.png?url";
 import vbmLogoLightUrl from "@assets/vbm-logo-2.png?url";
+import { useI18n } from "@/lib/i18n";
 
 export default function LoginPage() {
   const { toast } = useToast();
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const { language, setLanguage, t } = useI18n();
   const [mounted, setMounted] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,13 +45,21 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
-        const msg = await res.json().catch(() => ({ message: "Falha no login" }));
-        toast({ title: "Erro", description: msg.message || "Falha no login", variant: "destructive" });
+        const msg = await res.json().catch(() => ({ message: t("login.loginErrorDescription") }));
+        toast({ title: t("login.loginErrorTitle"), description: msg.message || t("login.loginErrorDescription"), variant: "destructive" });
       } else {
+        const userRes = await fetch("/api/auth/user", { credentials: "include" }).catch(() => null);
+        if (userRes?.ok) {
+          const user = await userRes.json().catch(() => null);
+          if (user?.role === "driver") {
+            window.location.assign("/agenda");
+            return;
+          }
+        }
         window.location.assign("/");
       }
     } catch (err: any) {
-      toast({ title: "Erro", description: err?.message || "Falha no login", variant: "destructive" });
+      toast({ title: t("login.loginErrorTitle"), description: err?.message || t("login.loginErrorDescription"), variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -65,20 +75,20 @@ export default function LoginPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        toast({ title: "Erro", description: body?.message || "E-mail não encontrado", variant: "destructive" });
+        toast({ title: t("login.loginErrorTitle"), description: body?.message || t("login.forgotCheckEmailError"), variant: "destructive" });
         return;
       }
       setForgotStep("reset");
-      toast({ title: "E-mail localizado", description: "Defina sua nova senha." });
+      toast({ title: t("login.forgotEmailFoundTitle"), description: t("login.forgotEmailFoundDescription") });
     } catch (err: any) {
-      toast({ title: "Erro", description: err?.message || "Falha ao verificar e-mail", variant: "destructive" });
+      toast({ title: t("login.loginErrorTitle"), description: err?.message || t("login.forgotCheckEmailError"), variant: "destructive" });
     }
-  }, [forgotEmail, toast]);
+  }, [forgotEmail, toast, t]);
 
   const handleReset = useCallback(async (e: FormEvent) => {
     e.preventDefault();
     if (!canSubmitReset) {
-      toast({ title: "Senha inválida", description: "As senhas devem coincidir e ter ao menos 6 caracteres.", variant: "destructive" });
+      toast({ title: t("login.forgotInvalidPasswordTitle"), description: t("login.forgotInvalidPasswordDescription"), variant: "destructive" });
       return;
     }
     try {
@@ -89,10 +99,10 @@ export default function LoginPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        toast({ title: "Erro", description: body?.message || "Falha ao redefinir senha", variant: "destructive" });
+        toast({ title: t("login.loginErrorTitle"), description: body?.message || t("login.forgotResetError"), variant: "destructive" });
         return;
       }
-      toast({ title: "Senha atualizada", description: "Sua senha foi redefinida. Realize o login." });
+      toast({ title: t("login.forgotPasswordUpdatedTitle"), description: t("login.forgotPasswordUpdatedDescription") });
       setForgotOpen(false);
       setForgotStep("email");
       setNewPass("");
@@ -100,9 +110,9 @@ export default function LoginPage() {
       setEmail(forgotEmail);
       setPassword("");
     } catch (err: any) {
-      toast({ title: "Erro", description: err?.message || "Falha ao redefinir senha", variant: "destructive" });
+      toast({ title: t("login.loginErrorTitle"), description: err?.message || t("login.forgotResetError"), variant: "destructive" });
     }
-  }, [forgotEmail, newPass, canSubmitReset, toast]);
+  }, [forgotEmail, newPass, canSubmitReset, toast, t]);
 
   return (
     <div className="min-h-screen w-full flex bg-background">
@@ -128,11 +138,10 @@ export default function LoginPage() {
               <h1 className="text-4xl font-display font-bold tracking-wide drop-shadow-lg">VBM Transfer Executivo</h1>
             </div>
             <h2 className="text-5xl font-display font-bold leading-tight mb-4 drop-shadow-lg">
-              Gestão de Frota Premium.
+              {t("login.heroTitle")}
             </h2>
             <p className="text-lg leading-relaxed text-primary-foreground/90">
-              Gerencie motoristas, veículos e clientes premium com precisão e elegância. 
-              O painel completo para serviços de transporte executivo.
+              {t("login.heroSubtitle")}
             </p>
           </div>
         </div>
@@ -151,15 +160,15 @@ export default function LoginPage() {
         <div className="w-full max-w-md space-y-8">
           <div className="text-center lg:text-left">
             <img src={mobileLogoUrl} alt="VBM Transfer Executivo" className="lg:hidden mx-auto mb-4 w-24 h-24 object-contain" />
-            <h2 className="text-3xl font-bold font-display text-primary">Bem-vindo</h2>
-            <p className="text-muted-foreground mt-2">Faça login para acessar seu painel.</p>
+            <h2 className="text-3xl font-bold font-display text-primary">{t("login.welcome")}</h2>
+            <p className="text-muted-foreground mt-2">{t("login.subtitle")}</p>
           </div>
 
           <Card className="border-none shadow-xl bg-card">
             <CardContent className="pt-6">
               <form className="space-y-4" onSubmit={handleSubmit}>
                 <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
+                  <Label htmlFor="email">{t("login.email")}</Label>
                   <Input
                     id="email"
                     type="email"
@@ -170,7 +179,7 @@ export default function LoginPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Senha</Label>
+                  <Label htmlFor="password">{t("login.password")}</Label>
                   <Input
                     id="password"
                     type="password"
@@ -185,24 +194,24 @@ export default function LoginPage() {
                   className="w-full h-12 text-lg font-medium shadow-lg hover:shadow-primary/25 transition-all duration-300"
                   disabled={loading}
                 >
-                  {loading ? "Entrando..." : "Entrar"}
+                  {loading ? t("login.entering") : t("login.enter")}
                 </Button>
                 <div className="mt-4 text-center space-y-1">
                   <a href="/register-setup" className="block text-sm text-primary hover:underline">
-                    Primeiro Acesso? Cadastre sua senha
+                    {t("login.firstAccess")}
                   </a>
                   <Dialog open={forgotOpen} onOpenChange={(v) => { setForgotOpen(v); if (!v) setForgotStep("email"); }}>
                     <DialogTrigger asChild>
-                      <button type="button" className="text-sm text-primary hover:underline">Esqueci minha senha</button>
+                      <button type="button" className="text-sm text-primary hover:underline">{t("login.forgotPassword")}</button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Recuperar senha</DialogTitle>
+                        <DialogTitle>{t("login.forgotTitle")}</DialogTitle>
                       </DialogHeader>
                       {forgotStep === "email" ? (
                         <form className="space-y-4" onSubmit={handleForgotEmail}>
                           <div className="space-y-2">
-                            <Label htmlFor="forgot-email">E-mail cadastrado</Label>
+                            <Label htmlFor="forgot-email">{t("login.forgotRegisteredEmail")}</Label>
                             <Input
                               id="forgot-email"
                               type="email"
@@ -212,7 +221,7 @@ export default function LoginPage() {
                               required
                             />
                           </div>
-                          <Button type="submit" className="w-full">Continuar</Button>
+                          <Button type="submit" className="w-full">{t("login.forgotContinue")}</Button>
                         </form>
                       ) : (
                         <form className="space-y-4" onSubmit={handleReset}>
@@ -221,14 +230,14 @@ export default function LoginPage() {
                             <div className="text-sm">{forgotEmail}</div>
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="new-pass">Nova senha</Label>
-                            <Input id="new-pass" type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="mín. 6 caracteres" />
+                            <Label htmlFor="new-pass">{t("login.forgotNewPassword")}</Label>
+                            <Input id="new-pass" type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder={t("login.forgotMinChars")} />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="new-pass2">Confirmar senha</Label>
+                            <Label htmlFor="new-pass2">{t("login.forgotConfirmPassword")}</Label>
                             <Input id="new-pass2" type="password" value={newPass2} onChange={(e) => setNewPass2(e.target.value)} />
                           </div>
-                          <Button type="submit" disabled={!canSubmitReset} className="w-full">Redefinir senha</Button>
+                          <Button type="submit" disabled={!canSubmitReset} className="w-full">{t("login.forgotResetAction")}</Button>
                         </form>
                       )}
                     </DialogContent>
@@ -236,11 +245,25 @@ export default function LoginPage() {
                 </div>
               </form>
               <div className="mt-6 text-center text-xs text-muted-foreground">
-                <p>Use seu e-mail e senha cadastrados.</p>
-                <p>Em caso de dúvida, contate o administrador.</p>
+                <p>{t("login.helpLine1")}</p>
+                <p>{t("login.helpLine2")}</p>
               </div>
             </CardContent>
           </Card>
+          <div className="flex justify-center">
+            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/80 px-3 py-2 backdrop-blur">
+              <Label htmlFor="login-language" className="text-xs">{t("common.language")}</Label>
+              <select
+                id="login-language"
+                className="bg-background border border-border rounded px-2 py-1 text-sm"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value === "es" ? "es" : "pt-BR")}
+              >
+                <option value="pt-BR">{t("common.portuguese")}</option>
+                <option value="es">{t("common.spanish")}</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
     </div>

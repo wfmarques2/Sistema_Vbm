@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { useFinanceProfit } from "@/hooks/use-financial";
 import { useRoute } from "wouter";
+import { useI18n } from "@/lib/i18n";
 
 export default function FinanceServiceDetailPage() {
+  const { t } = useI18n();
   const [match, params] = useRoute("/finance/services/:id");
   const id = params?.id ? Number(params.id) : 0;
   const { data: finance, isLoading, isError } = useFinanceProfit(id);
@@ -15,8 +17,8 @@ export default function FinanceServiceDetailPage() {
     <Layout>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Detalhe Financeiro da Viagem</h2>
-          <p className="text-muted-foreground">Resumo financeiro com indicador de prejuízo.</p>
+          <h2 className="text-3xl font-display font-bold text-primary">{t("financeServiceDetail.title")}</h2>
+          <p className="text-muted-foreground">{t("financeServiceDetail.subtitle")}</p>
         </div>
       </div>
 
@@ -25,7 +27,7 @@ export default function FinanceServiceDetailPage() {
           <CardTitle>Viagem #{id}</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading && <div className="text-muted-foreground">Carregando...</div>}
+          {isLoading && <div className="text-muted-foreground">{t("finance.common.loading")}</div>}
           {isError && <div className="text-destructive">Erro ao carregar dados financeiros.</div>}
           {finance && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

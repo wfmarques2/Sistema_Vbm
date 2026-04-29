@@ -5,10 +5,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Download, Printer } from "lucide-react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { es, ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
+import { useI18n } from "@/lib/i18n";
 
 export default function ReportsPage() {
+  const { language, t } = useI18n();
+  const dateLocale = language === "es" ? es : ptBR;
   const { data: services, isLoading } = useServices();
 
   // Calculate simple totals
@@ -67,17 +70,17 @@ export default function ReportsPage() {
     <Layout>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Relatórios Financeiros de Serviços</h2>
-          <p className="text-muted-foreground">Análise de receita e serviços.</p>
+          <h2 className="text-3xl font-display font-bold text-primary">{t("reports.title")}</h2>
+          <p className="text-muted-foreground">{t("reports.subtitle")}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handlePrint} aria-label="Imprimir Relatório">
             <Printer className="w-4 h-4 mr-2" />
-            Imprimir
+            {t("reports.print")}
           </Button>
           <Button onClick={handleExportCsv} aria-label="Exportar CSV" disabled={!services || services.length === 0}>
             <Download className="w-4 h-4 mr-2" />
-            Exportar CSV
+            {t("reports.exportCsv")}
           </Button>
         </div>
       </div>
@@ -137,7 +140,7 @@ export default function ReportsPage() {
             ) : (
               services?.map((service) => (
                 <TableRow key={service.id}>
-                  <TableCell>{format(new Date(service.dateTime), 'dd MMM yyyy', { locale: ptBR })}</TableCell>
+                  <TableCell>{format(new Date(service.dateTime), 'dd MMM yyyy', { locale: dateLocale })}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">#{service.id.toString().padStart(4, '0')}</TableCell>
                   <TableCell>{service.clientName}</TableCell>
                   <TableCell className="capitalize">{service.paymentMethod}</TableCell>

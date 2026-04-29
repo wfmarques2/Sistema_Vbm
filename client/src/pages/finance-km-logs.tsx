@@ -7,8 +7,10 @@ import { useCreateKmLog, useListKmLogs } from "@/hooks/use-financial";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateQuickFilters } from "@/components/date-quick-filters";
+import { useI18n } from "@/lib/i18n";
 
 export default function FinanceKmLogsPage() {
+  const { t } = useI18n();
   const [vehicleId, setVehicleId] = useState<number | "">("");
   const [driverId, setDriverId] = useState<number | "">("");
   const [serviceId, setServiceId] = useState<number | "">("");
@@ -40,13 +42,13 @@ export default function FinanceKmLogsPage() {
   return (
     <Layout>
       <div className="mb-8">
-        <h2 className="text-3xl font-display font-bold text-primary">Logs de KM de Veículo</h2>
-        <p className="text-muted-foreground">Registro de odômetro por veículo e serviço.</p>
+        <h2 className="text-3xl font-display font-bold text-primary">{t("financeKm.title")}</h2>
+        <p className="text-muted-foreground">{t("financeKm.subtitle")}</p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Registrar Log</CardTitle>
+            <CardTitle>{t("financeKm.register")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Input placeholder="Vehicle ID" value={vehicleId} onChange={(e) => setVehicleId(Number(e.target.value) || "")} />
@@ -80,7 +82,7 @@ export default function FinanceKmLogsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Listagem</CardTitle>
+            <CardTitle>{t("financeKm.list")}</CardTitle>
           </CardHeader>
           <CardContent>
             <DateQuickFilters
@@ -109,7 +111,7 @@ export default function FinanceKmLogsPage() {
               </div>
             </div>
             <Button onClick={() => refetch()} disabled={isLoading}>Filtrar</Button>
-            {isLoading && <div className="text-muted-foreground mt-4">Carregando...</div>}
+            {isLoading && <div className="text-muted-foreground mt-4">{t("finance.common.loading")}</div>}
             {isError && <div className="text-destructive mt-4">Erro ao carregar logs.</div>}
             {rows && (
               <Table className="mt-4">

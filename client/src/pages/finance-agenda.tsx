@@ -9,8 +9,11 @@ import { addMonths, format, startOfMonth, endOfMonth, addDays, subDays } from "d
 import { useCreateCompanyExpense, useListUnifiedExpenses, useDeleteUnifiedExpense, useListCompanyExpenses, useListVehicleExpenses } from "@/hooks/use-financial";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateQuickFilters } from "@/components/date-quick-filters";
+import { useI18n } from "@/lib/i18n";
 
 export default function FinanceAgendaPage() {
+  const { language, t } = useI18n();
+  const locale = language === "es" ? "es-ES" : "pt-BR";
   const today = new Date();
   const defaultStart = startOfMonth(today).toISOString().slice(0, 10);
   const defaultEnd = endOfMonth(today).toISOString().slice(0, 10);
@@ -18,20 +21,13 @@ export default function FinanceAgendaPage() {
   const [end, setEnd] = useState<string>(defaultEnd);
   const [showFilters, setShowFilters] = useState(false);
   const [filterMonth, setFilterMonth] = useState<string>(String(today.getMonth()));
-  const monthOptions = [
-    "Janeiro",
-    "Fevereiro",
-    "Março",
-    "Abril",
-    "Maio",
-    "Junho",
-    "Julho",
-    "Agosto",
-    "Setembro",
-    "Outubro",
-    "Novembro",
-    "Dezembro",
-  ];
+  const monthOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, month) =>
+        new Date(2026, month, 1).toLocaleString(locale, { month: "long" })
+      ),
+    [locale]
+  );
   const toDateInput = (d: Date) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -71,8 +67,8 @@ export default function FinanceAgendaPage() {
     <Layout>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Agenda Financeira</h2>
-          <p className="text-muted-foreground">Exibe despesas pelo período selecionado.</p>
+          <h2 className="text-3xl font-display font-bold text-primary">{t("financeAgenda.title")}</h2>
+          <p className="text-muted-foreground">{t("financeAgenda.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <div className="min-w-44">
@@ -102,7 +98,7 @@ export default function FinanceAgendaPage() {
           </div>
           <Button variant="outline" className="gap-2" onClick={() => setShowFilters((s) => !s)}>
             <Filter className="w-4 h-4" />
-            {showFilters ? "Ocultar filtros" : "Filtros"}
+            {showFilters ? t("finance.common.hideFilters") : t("finance.common.filters")}
           </Button>
         </div>
       </div>
@@ -110,7 +106,7 @@ export default function FinanceAgendaPage() {
       {showFilters && (
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Período</CardTitle>
+          <CardTitle>{t("financeAgenda.period")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <DateQuickFilters
@@ -152,10 +148,10 @@ export default function FinanceAgendaPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Agenda de despesas</CardTitle>
+          <CardTitle>{t("financeAgenda.expenseAgenda")}</CardTitle>
         </CardHeader>
         <CardContent>
-          {loadingUnified && <div className="text-muted-foreground">Carregando...</div>}
+          {loadingUnified && <div className="text-muted-foreground">{t("finance.common.loading")}</div>}
           {!loadingUnified && (
             <Table>
               <TableHeader>
@@ -183,7 +179,7 @@ export default function FinanceAgendaPage() {
                        "serviceId" in r && (r as any).serviceId ? `Serviço #${(r as any).serviceId}` : "Empresa"}
                     </TableCell>
                     <TableCell>{"statusPagamento" in r ? (r.statusPagamento || "-") : "-"}</TableCell>
-                    <TableCell>{(r.valorCentavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
+                    <TableCell>{(r.valorCentavos / 100).toLocaleString(locale, { style: "currency", currency: "BRL" })}</TableCell>
                     <TableCell>
                       {r.tipo === "company" && (
                         <Button variant="outline" size="sm" onClick={() => scheduleNextMonth(r)}>

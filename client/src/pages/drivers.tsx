@@ -32,9 +32,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { es, ptBR } from "date-fns/locale";
+import { useI18n } from "@/lib/i18n";
 
 export default function DriversPage() {
+  const { language, t } = useI18n();
+  const dateLocale = language === "es" ? es : ptBR;
   const { data: drivers, isLoading } = useDrivers();
   const createMutation = useCreateDriver();
   const updateMutation = useUpdateDriver();
@@ -98,20 +101,20 @@ export default function DriversPage() {
     <Layout>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Motoristas</h2>
-          <p className="text-muted-foreground">Gerencie a equipe de motoristas.</p>
+          <h2 className="text-3xl font-display font-bold text-primary">{t("drivers.title")}</h2>
+          <p className="text-muted-foreground">{t("drivers.subtitle")}</p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => { setEditingId(null); form.reset(); }} className="bg-primary shadow-lg hover:shadow-primary/30">
               <Plus className="w-4 h-4 mr-2" />
-              Adicionar Motorista
+              {t("drivers.add")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingId ? "Editar Motorista" : "Adicionar Motorista"}</DialogTitle>
+              <DialogTitle>{editingId ? t("drivers.edit") : t("drivers.add")}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -184,7 +187,7 @@ export default function DriversPage() {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {editingId ? "Atualizar Motorista" : "Criar Motorista"}
+                  {editingId ? t("drivers.update") : t("drivers.create")}
                 </Button>
               </form>
             </Form>
@@ -202,14 +205,14 @@ export default function DriversPage() {
               <TableHead>Vínculo</TableHead>
               <TableHead>Validade CNH</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+              <TableHead className="text-right">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-               <TableRow><TableCell colSpan={7} className="text-center py-8">Carregando motoristas...</TableCell></TableRow>
+               <TableRow><TableCell colSpan={7} className="text-center py-8">{t("drivers.loading")}</TableCell></TableRow>
             ) : drivers?.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum motorista encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">{t("drivers.empty")}</TableCell></TableRow>
             ) : (
               drivers?.map((driver) => (
                 <TableRow key={driver.id} className="group hover:bg-muted/30 transition-colors">
@@ -227,7 +230,7 @@ export default function DriversPage() {
                   <TableCell>
                     <div className="flex items-center text-sm">
                       <Calendar className="w-3 h-3 mr-1" />
-                      {format(new Date(driver.licenseValidity), 'dd/MM/yyyy', { locale: ptBR })}
+                      {format(new Date(driver.licenseValidity), 'dd/MM/yyyy', { locale: dateLocale })}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -242,7 +245,7 @@ export default function DriversPage() {
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-1">
                           <MoreHorizontal className="w-4 h-4" />
-                          Ações
+                          {t("common.actions")}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -252,7 +255,7 @@ export default function DriversPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDelete(driver.id)}>
                           <Trash2 className="w-4 h-4 text-red-600" />
-                          Excluir
+                          {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

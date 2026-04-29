@@ -27,8 +27,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
 import { useDrivers } from "@/hooks/use-drivers";
+import { useI18n } from "@/lib/i18n";
 
 export default function SettingsPage() {
+  const { t } = useI18n();
   const { user: currentUser } = useAuth();
   const { data: users, isLoading } = useUsers();
   const { data: drivers, isLoading: loadingDrivers } = useDrivers();
@@ -63,8 +65,8 @@ export default function SettingsPage() {
       return (
           <Layout>
               <div className="flex flex-col items-center justify-center h-full">
-                  <h1 className="text-2xl font-bold">Acesso Negado</h1>
-                  <p>Você não tem permissão para acessar esta página.</p>
+                  <h1 className="text-2xl font-bold">{t("settings.accessDeniedTitle")}</h1>
+                  <p>{t("settings.accessDeniedText")}</p>
               </div>
           </Layout>
       )
@@ -74,8 +76,8 @@ export default function SettingsPage() {
     <Layout>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Configurações</h2>
-          <p className="text-muted-foreground">Gerencie usuários e permissões do sistema.</p>
+          <h2 className="text-3xl font-display font-bold text-primary">{t("settings.title")}</h2>
+          <p className="text-muted-foreground">{t("settings.subtitle")}</p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

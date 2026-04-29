@@ -1,24 +1,73 @@
 import { Layout } from "@/components/layout";
 import { useServices } from "@/hooks/use-services";
 import { format, isSameDay, isSameMonth, addMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { es, ptBR } from "date-fns/locale";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Clock, MapPin, ChevronLeft as BackIcon, X, CircleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, MapPin, ChevronLeft as BackIcon, CircleAlert } from "lucide-react";
 import { SiWaze, SiGooglemaps, SiWhatsapp } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { useUpdateService } from "@/hooks/use-services";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useI18n } from "@/lib/i18n";
+
+type AgendaServiceItem = {
+  key: string;
+  serviceId: number;
+  kind: "return" | "outbound";
+  dateTime: string | Date;
+  origin: string;
+  destination: string;
+  driverName: string;
+  type: string;
+  clientName: string;
+  status: string;
+  clientPhone?: string | null;
+};
 
 export default function AgendaPage() {
+  const { language, t } = useI18n();
+  const numberLocale = language === "es" ? "es-ES" : "pt-BR";
+  const dateLocale = language === "es" ? es : ptBR;
+  const STOP_PROGRESS_STORAGE_KEY = "vbm_agenda_stop_progress";
+  const [stopProgressByService, setStopProgressByService] = useState<Record<number, number>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = window.localStorage.getItem(STOP_PROGRESS_STORAGE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return {};
+      return parsed as Record<number, number>;
+    } catch {
+      return {};
+    }
+  });
+
+  const persistStopProgress = (next: Record<number, number>) => {
+    setStopProgressByService(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STOP_PROGRESS_STORAGE_KEY, JSON.stringify(next));
+    }
+  };
+
+  const setServiceStopProgress = (serviceId: number, progress: number) => {
+    const normalized = Math.max(0, Math.floor(progress));
+    const next = { ...stopProgressByService, [serviceId]: normalized };
+    persistStopProgress(next);
+  };
+
+  const clearServiceStopProgress = (serviceId: number) => {
+    if (!(serviceId in stopProgressByService)) return;
+    const next = { ...stopProgressByService };
+    delete next[serviceId];
+    persistStopProgress(next);
+  };
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -34,7 +83,7 @@ export default function AgendaPage() {
   const gridEnd = endOfWeek(monthEnd);
   const gridDays = eachDayOfInterval({ start: gridStart, end: gridEnd });
 
-  const agendaServices = useMemo(() => {
+  const agendaServices = useMemo<AgendaServiceItem[]>(() => {
     const base = services || [];
     return base.map((service: any) => ({
       key: `service-${service.id}`,
@@ -52,8 +101,8 @@ export default function AgendaPage() {
   }, [services]);
 
   const todaysServices = agendaServices
-    .filter(s => isSameDay(new Date(s.dateTime), selectedDate))
-    .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+    .filter((s: AgendaServiceItem) => isSameDay(new Date(s.dateTime), selectedDate))
+    .sort((a: AgendaServiceItem, b: AgendaServiceItem) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
   const [openServiceId, setOpenServiceId] = useState<string | null>(null);
   const updateMutation = useUpdateService();
@@ -71,7 +120,7 @@ export default function AgendaPage() {
   function toBRL(cents: number | null | undefined): string {
     const value = typeof cents === "number" ? cents : 0;
     const reais = value / 100;
-    return reais.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    return reais.toLocaleString(numberLocale, { style: "currency", currency: "BRL" });
   }
 
   function parseBRLToCents(input: string): number {
@@ -258,8 +307,8 @@ export default function AgendaPage() {
   return (
     <Layout>
       <div className="mb-8">
-        <h2 className="text-3xl font-display font-bold text-primary">Agenda Operacional</h2>
-        <p className="text-muted-foreground">Agenda e cronograma diário.</p>
+        <h2 className="text-3xl font-display font-bold text-primary">{t("agenda.title")}</h2>
+        <p className="text-muted-foreground">{t("agenda.subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -270,7 +319,7 @@ export default function AgendaPage() {
                 <Button variant="ghost" size="icon" onClick={() => setSelectedDate(addMonths(selectedDate, -1))}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <span className="font-medium">{format(selectedDate, 'MMMM yyyy', { locale: ptBR })}</span>
+                <span className="font-medium">{format(selectedDate, 'MMMM yyyy', { locale: dateLocale })}</span>
                 <Button variant="ghost" size="icon" onClick={() => setSelectedDate(addMonths(selectedDate, 1))}>
                   <ChevronRight className="w-4 h-4" />
                 </Button>
@@ -279,7 +328,7 @@ export default function AgendaPage() {
                 {['D','S','T','Q','Q','S','S'].map(d => <div key={d} className="text-muted-foreground py-2">{d}</div>)}
                 {gridDays.map((day) => {
                   const isSelected = isSameDay(day, selectedDate);
-                  const hasEvents = agendaServices.some(s => isSameDay(new Date(s.dateTime), day));
+                  const hasEvents = agendaServices.some((s: AgendaServiceItem) => isSameDay(new Date(s.dateTime), day));
                   const inMonth = isSameMonth(day, monthStart);
                   
                   return (
@@ -304,33 +353,33 @@ export default function AgendaPage() {
           </Card>
 
           <div className="bg-primary/5 p-6 rounded-xl border border-primary/10">
-            <h3 className="font-semibold text-primary mb-2">Resumo</h3>
+            <h3 className="font-semibold text-primary mb-2">{t("agenda.summary")}</h3>
             <p className="text-sm text-muted-foreground">
-              Você tem <span className="font-bold text-primary">{todaysServices.length}</span> serviços para {format(selectedDate, 'dd MMM', { locale: ptBR })}.
+              Você tem <span className="font-bold text-primary">{todaysServices.length}</span> serviços para {format(selectedDate, 'dd MMM', { locale: dateLocale })}.
             </p>
           </div>
         </div>
 
         <div className="lg:col-span-2">
-          <h3 className="text-xl font-semibold mb-4">{format(selectedDate, 'EEEE, dd MMMM', { locale: ptBR })}</h3>
+          <h3 className="text-xl font-semibold mb-4">{format(selectedDate, 'EEEE, dd MMMM', { locale: dateLocale })}</h3>
           
           <div className="space-y-4">
             {isLoading ? (
-              <p>Carregando agenda...</p>
+              <p>{t("agenda.loading")}</p>
             ) : todaysServices.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 bg-card rounded-xl border border-dashed border-border text-muted-foreground">
                 <Clock className="w-12 h-12 mb-4 opacity-20" />
-                <p>Nenhum serviço agendado para este dia.</p>
+                <p>{t("agenda.empty")}</p>
               </div>
             ) : (
-              todaysServices.map((service) => (
+              todaysServices.map((service: AgendaServiceItem) => (
                 <div 
                   key={service.key}
                   className="bg-card p-4 rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow flex gap-4 cursor-pointer"
                   onClick={() => setOpenServiceId(service.key)}
                 >
                   <div className="flex flex-col items-center justify-center w-16 bg-secondary rounded-lg">
-                    <span className="text-sm font-bold text-primary">{format(new Date(service.dateTime), 'HH:mm', { locale: ptBR })}</span>
+                    <span className="text-sm font-bold text-primary">{format(new Date(service.dateTime), 'HH:mm', { locale: dateLocale })}</span>
                   </div>
                   
                   <div className="flex-1">
@@ -380,7 +429,7 @@ export default function AgendaPage() {
       >
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto bg-background text-foreground border border-border">
           {(() => {
-            const selectedItem = todaysServices.find(x => x.key === openServiceId);
+            const selectedItem = todaysServices.find((x: AgendaServiceItem) => x.key === openServiceId);
             const s = (services || []).find((x: any) => x.id === selectedItem?.serviceId);
             const isReturnItem = selectedItem?.kind === "return";
             if (!s) return <div className="text-muted-foreground">Selecione um serviço</div>;
@@ -390,16 +439,32 @@ export default function AgendaPage() {
               // marcação simples no objeto para evitar reinit loops
               setCosts((prev: any) => ({ ...prev, __initFrom: s.id }));
             }
+            const serviceId = s.id;
+            const tripStops = [
+              s.stop1,
+              s.stop2,
+              s.stop3,
+              s.stop4,
+              s.stop5,
+            ]
+              .map((v: any) => String(v || "").trim())
+              .filter(Boolean);
             const canAdvance = ["scheduled", "driving_pickup", "pickup_location", "driving_destination", "in_progress"].includes(String(s.status));
+            const destinationPhase = s.status === "driving_destination" || String(s.status) === "in_progress";
+            const rawStopProgress = stopProgressByService[serviceId] ?? 0;
+            const stopProgress = Math.max(0, Math.min(tripStops.length, rawStopProgress));
+            const hasPendingStops = destinationPhase && stopProgress < tripStops.length;
+            const activeStopNumber = destinationPhase && stopProgress > 0 && stopProgress <= tripStops.length ? stopProgress : null;
+            const nextStopNumber = hasPendingStops ? stopProgress + 1 : null;
             const nextStatus = s.status === "scheduled"
               ? "driving_pickup"
               : s.status === "driving_pickup"
               ? "pickup_location"
               : s.status === "pickup_location"
               ? "driving_destination"
-              : String(s.status) === "in_progress"
-              ? "finished"
-              : s.status === "driving_destination"
+              : destinationPhase && hasPendingStops
+              ? "driving_destination"
+              : destinationPhase
               ? "finished"
               : null;
             const canFinish = s.status === "driving_destination" || String(s.status) === "in_progress";
@@ -420,15 +485,6 @@ export default function AgendaPage() {
               ? String(s.kmPrevisto).replace(".", ",")
               : "";
             const tripTempoEstimado = String(s.tempoEstimado || "").trim();
-            const tripStops = [
-              s.stop1,
-              s.stop2,
-              s.stop3,
-              s.stop4,
-              s.stop5,
-            ]
-              .map((v: any) => String(v || "").trim())
-              .filter(Boolean);
             const navigationSteps = [
               { title: "Dirigir até o embarque", address: tripOrigin, pinClassName: "text-primary" },
               ...tripStops.map((stop: string, idx: number) => ({
@@ -439,7 +495,6 @@ export default function AgendaPage() {
               { title: "Dirigir até o destino", address: tripDestination, pinClassName: "text-blue-400" },
             ];
             const whatsappUrl = buildWhatsappUrl(s.clientPhone);
-            const serviceId = s.id;
             const vehicleId = isReturnItem ? (s.returnVehicleId || s.vehicleId) : s.vehicleId;
             const flightSearchUrl = buildFlightSearchUrl(tripFlight);
             const paxTotal = Number(s.passengers || 0) > 0
@@ -473,7 +528,7 @@ export default function AgendaPage() {
                   <div className="space-y-2 text-sm">
                     <div><span className="font-semibold text-primary">Cliente:</span> {s.clientName}</div>
                     <div><span className="font-semibold text-primary">Motorista:</span> {tripDriver}</div>
-                    <div><span className="font-semibold text-primary">Data/Hora:</span> {format(new Date(tripDateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</div>
+                    <div><span className="font-semibold text-primary">Data/Hora:</span> {format(new Date(tripDateTime), 'dd/MM/yyyy HH:mm', { locale: dateLocale })}</div>
                     <div><span className="font-semibold text-primary">Voo:</span> {tripFlight || "-"}</div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {flightSearchUrl ? (
@@ -545,7 +600,7 @@ export default function AgendaPage() {
                         <CircleAlert className="w-4 h-4 mt-0.5" />
                         <div>
                           <span className="font-semibold">Cobrar do Passageiro:</span>{" "}
-                          {(payDriverAmountCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}{" "}
+                          {(payDriverAmountCents / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}{" "}
                           no {paymentMethodLabel(s.paymentMethod)}
                         </div>
                       </div>
@@ -576,15 +631,31 @@ export default function AgendaPage() {
                     <Button 
                       disabled={!canAdvance || !nextStatus || updateMutation.isPending}
                       onClick={async () => {
+                        if (destinationPhase && nextStopNumber) {
+                          const ok = window.confirm(`Deseja avançar para a parada ${nextStopNumber}?`);
+                          if (!ok) return;
+                          if (String(s.status) === "in_progress") {
+                            await updateMutation.mutateAsync({ id: serviceId, status: "driving_destination" as any });
+                          }
+                          setServiceStopProgress(serviceId, nextStopNumber);
+                          return;
+                        }
                         if (!nextStatus) return;
                         const ok = window.confirm(`Deseja avançar o status para "${statusLabel(nextStatus)}"?`);
                         if (!ok) return;
                         await updateMutation.mutateAsync({ id: serviceId, status: nextStatus as any });
+                        if (nextStatus === "finished") {
+                          clearServiceStopProgress(serviceId);
+                        }
                       }}
                       className="bg-primary text-primary-foreground hover:bg-primary/90"
                       style={{ width: "100%" }}
                     >
-                      {nextStatus ? `Avançar: ${statusLabel(nextStatus)}` : "Sem próximo status"}
+                      {nextStopNumber
+                        ? `Avançar: parada ${nextStopNumber}`
+                        : nextStatus
+                        ? `Avançar: ${statusLabel(nextStatus)}`
+                        : "Sem próximo status"}
                     </Button>
                     <Button 
                       disabled={!canFinish || updateMutation.isPending}
@@ -610,6 +681,7 @@ export default function AgendaPage() {
                           } catch {}
                         }
                         await updateMutation.mutateAsync({ id: serviceId, status: "finished" });
+                        clearServiceStopProgress(serviceId);
                         setOpenServiceId(null);
                       }}
                       variant="secondary"
@@ -620,7 +692,13 @@ export default function AgendaPage() {
                     </Button>
                   </div>
                   <div className="mt-2 text-sm text-muted-foreground">
-                    <div>{`Status: ${driverActionStatus(String(s.status), nextStatus)}`}</div>
+                    <div>
+                      {`Status: ${
+                        activeStopNumber
+                          ? `Dirigindo até a parada ${activeStopNumber}.`
+                          : driverActionStatus(String(s.status), nextStatus)
+                      }`}
+                    </div>
                     {isReturnItem && <div>Item de retorno vinculado ao mesmo serviço.</div>}
                   </div>
                 </div>
@@ -726,6 +804,7 @@ export default function AgendaPage() {
                         const ok = window.confirm("Confirmar cancelamento da corrida?");
                         if (!ok) return;
                         await updateMutation.mutateAsync({ id: serviceId, status: "canceled" });
+                        clearServiceStopProgress(serviceId);
                         setOpenServiceId(null);
                       }}
                     >

@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { es, ptBR } from "date-fns/locale";
 import { Plus, Search, Filter, Pencil, Trash2, CalendarIcon, ChevronDown, DollarSign, MoreHorizontal, Download } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useEffect, useMemo, useState } from "react";
@@ -45,8 +45,12 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DateQuickFilters } from "@/components/date-quick-filters";
 import { useQueryClient } from "@tanstack/react-query";
+import { useI18n } from "@/lib/i18n";
 
 export default function ServicesPage() {
+  const { language, t } = useI18n();
+  const numberLocale = language === "es" ? "es-ES" : "pt-BR";
+  const dateLocale = language === "es" ? es : ptBR;
   const [location, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [valueDisplay, setValueDisplay] = useState("R$ 0,00");
@@ -277,7 +281,7 @@ export default function ServicesPage() {
       await updateMutation.mutateAsync({ id: editingId, ...payload });
       if (saldoDeltaCents != null && saldoDeltaCents !== 0) {
         const abs = Math.abs(saldoDeltaCents);
-        const brl = (abs / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        const brl = (abs / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" });
         toast({
           title: saldoDeltaCents > 0 ? "Saldo debitado" : "Saldo creditado",
           description: saldoDeltaCents > 0
@@ -297,11 +301,11 @@ export default function ServicesPage() {
   const openFinanceDialog = (service: any) => {
     setFinanceServiceId(service.id);
     setFinanceDriverId(typeof service.driverId === "number" ? service.driverId : null);
-    setCombDisplay(((service.combustivel ?? 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
-    setPedagioDisplay(((service.pedagio ?? 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
-    setEstacDisplay(((service.estacionamento ?? 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
-    setAlimDisplay(((service.alimentacao ?? 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
-    setOutrosDisplay(((service.outrosCustos ?? 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+    setCombDisplay(((service.combustivel ?? 0) / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
+    setPedagioDisplay(((service.pedagio ?? 0) / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
+    setEstacDisplay(((service.estacionamento ?? 0) / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
+    setAlimDisplay(((service.alimentacao ?? 0) / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
+    setOutrosDisplay(((service.outrosCustos ?? 0) / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
     setDriverPayDisplay("R$ 0,00");
     setIsFinanceDialogOpen(true);
   };
@@ -439,7 +443,7 @@ export default function ServicesPage() {
             Number(service.paxSen || 0) +
             Number(service.paxFree || 0);
       return {
-        "Data/Hora": format(new Date(service.dateTime), "dd/MM/yyyy HH:mm", { locale: ptBR }),
+        "Data/Hora": format(new Date(service.dateTime), "dd/MM/yyyy HH:mm", { locale: dateLocale }),
         "Cliente": formatPassengerNames(service.clientName),
         "Rota": `${service.origin} → ${service.destination}`,
         "Motorista": service.driver?.name || "Não atribuído",
@@ -529,14 +533,14 @@ export default function ServicesPage() {
     <Layout>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Serviços</h2>
+          <h2 className="text-3xl font-display font-bold text-primary">{t("services.title")}</h2>
           <p className="text-muted-foreground">Gerencie transfers e alocações.</p>
         </div>
         
         <div>
           <Button asChild className="bg-primary shadow-lg hover:shadow-primary/30">
             <Link href="/services/new">
-              <Plus className="w-4 h-4 mr-2" /> Novo Serviço
+              <Plus className="w-4 h-4 mr-2" /> {t("services.new")}
             </Link>
           </Button>
         </div>
@@ -771,7 +775,7 @@ export default function ServicesPage() {
                       const digits = e.target.value.replace(/\D/g, "");
                       const cents = digits ? parseInt(digits, 10) : 0;
                       const amount = cents / 100;
-                      setCombDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                      setCombDisplay(amount.toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
                     }}
                   />
                 </div>
@@ -787,7 +791,7 @@ export default function ServicesPage() {
                       const digits = e.target.value.replace(/\D/g, "");
                       const cents = digits ? parseInt(digits, 10) : 0;
                       const amount = cents / 100;
-                      setPedagioDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                      setPedagioDisplay(amount.toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
                     }}
                   />
                 </div>
@@ -800,7 +804,7 @@ export default function ServicesPage() {
                       const digits = e.target.value.replace(/\D/g, "");
                       const cents = digits ? parseInt(digits, 10) : 0;
                       const amount = cents / 100;
-                      setEstacDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                      setEstacDisplay(amount.toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
                     }}
                   />
                 </div>
@@ -816,7 +820,7 @@ export default function ServicesPage() {
                       const digits = e.target.value.replace(/\D/g, "");
                       const cents = digits ? parseInt(digits, 10) : 0;
                       const amount = cents / 100;
-                      setAlimDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                      setAlimDisplay(amount.toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
                     }}
                   />
                 </div>
@@ -829,7 +833,7 @@ export default function ServicesPage() {
                       const digits = e.target.value.replace(/\D/g, "");
                       const cents = digits ? parseInt(digits, 10) : 0;
                       const amount = cents / 100;
-                      setOutrosDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                      setOutrosDisplay(amount.toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
                     }}
                   />
                 </div>
@@ -844,7 +848,7 @@ export default function ServicesPage() {
                       const digits = e.target.value.replace(/\D/g, "");
                       const cents = digits ? parseInt(digits, 10) : 0;
                       const amount = cents / 100;
-                      setDriverPayDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                      setDriverPayDisplay(amount.toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
                     }}
                   />
                   <div className="text-xs text-muted-foreground mt-1">Será somado em “Outros Custos”.</div>
@@ -998,14 +1002,14 @@ export default function ServicesPage() {
               <TableHead>Despesas</TableHead>
               <TableHead>Resultado</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+              <TableHead className="text-right">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-               <TableRow><TableCell colSpan={11} className="text-center py-8">Carregando serviços...</TableCell></TableRow>
+               <TableRow><TableCell colSpan={11} className="text-center py-8">{t("services.loading")}</TableCell></TableRow>
             ) : displayServices.length === 0 ? (
-              <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum serviço encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">{t("services.empty")}</TableCell></TableRow>
             ) : (
               displayServices.map((service, index) => {
                 const prevService = index > 0 ? displayServices[index - 1] : null;
@@ -1048,8 +1052,8 @@ export default function ServicesPage() {
                   </TableCell>
                   <TableCell className={service.isReturn ? "pl-6" : ""}>
                     <div className="flex flex-col">
-                      <span className="font-medium">{format(new Date(service.dateTime), 'dd/MM/yyyy', { locale: ptBR })}</span>
-                      <span className="text-xs text-muted-foreground">{format(new Date(service.dateTime), 'HH:mm', { locale: ptBR })}</span>
+                      <span className="font-medium">{format(new Date(service.dateTime), 'dd/MM/yyyy', { locale: dateLocale })}</span>
+                      <span className="text-xs text-muted-foreground">{format(new Date(service.dateTime), 'HH:mm', { locale: dateLocale })}</span>
                     </div>
                   </TableCell>
                   <TableCell className={service.isReturn ? "pl-6" : ""}>
@@ -1081,18 +1085,18 @@ export default function ServicesPage() {
                       <span className="text-xs text-muted-foreground">Incluso na ida</span>
                     ) : (
                       <span className="font-medium">
-                        {(finance.valueCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                        {(finance.valueCents / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}
                       </span>
                     )}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                       <span>
-                        {(finance.expenseCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                        {(finance.expenseCents / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}
                       </span>
                       {!service.isReturn && finance.returnExpenses > 0 && (
                         <span className="text-[11px] text-muted-foreground">
-                          inclui retorno: {(finance.returnExpenses / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                          inclui retorno: {(finance.returnExpenses / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}
                         </span>
                       )}
                     </div>
@@ -1102,7 +1106,7 @@ export default function ServicesPage() {
                       <span className="text-xs text-muted-foreground">Consolidado na ida</span>
                     ) : (
                       <span className={finance.resultCents < 0 ? "text-red-600 font-medium" : "text-green-600 font-medium"}>
-                        {(finance.resultCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                        {(finance.resultCents / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}
                       </span>
                     )}
                   </TableCell>
@@ -1112,7 +1116,7 @@ export default function ServicesPage() {
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-1">
                           <MoreHorizontal className="w-4 h-4" />
-                          Ações
+                          {t("common.actions")}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -1187,19 +1191,19 @@ export default function ServicesPage() {
                         <div className="mb-2 text-sm font-medium">Despesas da corrida</div>
                         <div className="flex flex-wrap gap-2">
                           {(service.combustivel || 0) > 0 && (
-                            <Badge variant="outline">Combustível: {(service.combustivel / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</Badge>
+                            <Badge variant="outline">Combustível: {(service.combustivel / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}</Badge>
                           )}
                           {(service.pedagio || 0) > 0 && (
-                            <Badge variant="outline">Pedágio: {(service.pedagio / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</Badge>
+                            <Badge variant="outline">Pedágio: {(service.pedagio / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}</Badge>
                           )}
                           {(service.estacionamento || 0) > 0 && (
-                            <Badge variant="outline">Estacionamento: {(service.estacionamento / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</Badge>
+                            <Badge variant="outline">Estacionamento: {(service.estacionamento / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}</Badge>
                           )}
                           {(service.alimentacao || 0) > 0 && (
-                            <Badge variant="outline">Alimentação: {(service.alimentacao / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</Badge>
+                            <Badge variant="outline">Alimentação: {(service.alimentacao / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}</Badge>
                           )}
                           {(service.outrosCustos || 0) > 0 && (
-                            <Badge variant="outline">Outros: {(service.outrosCustos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</Badge>
+                            <Badge variant="outline">Outros: {(service.outrosCustos / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}</Badge>
                           )}
                           {!service.combustivel &&
                             !service.pedagio &&
@@ -1233,9 +1237,9 @@ export default function ServicesPage() {
 
         <div className="md:hidden space-y-3">
           {isLoading ? (
-            <div className="text-center py-8">Carregando serviços...</div>
+            <div className="text-center py-8">{t("services.loading")}</div>
             ) : displayServices.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">Nenhum serviço encontrado.</div>
+            <div className="text-center py-8 text-muted-foreground">{t("services.empty")}</div>
           ) : (
             displayServices.map((service, index) => {
               const prevService = index > 0 ? displayServices[index - 1] : null;
@@ -1258,7 +1262,7 @@ export default function ServicesPage() {
                   <div>
                     <div className="text-xs text-muted-foreground">#{String(service.id).padStart(4, "0")}</div>
                     <div className="font-medium">
-                      {format(new Date(service.dateTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}{service.isReturn ? " • Retorno" : ""}
+                      {format(new Date(service.dateTime), 'dd/MM/yyyy HH:mm', { locale: dateLocale })}{service.isReturn ? " • Retorno" : ""}
                     </div>
                     <div className="mt-1">
                       {hasLinkedReturn && <Badge variant="outline" className="text-[10px] border-cyan-700/60 text-cyan-300">IDA+RETORNO</Badge>}
@@ -1269,7 +1273,7 @@ export default function ServicesPage() {
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-1">
                         <MoreHorizontal className="w-4 h-4" />
-                        Ações
+                        {t("common.actions")}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -1360,7 +1364,7 @@ export default function ServicesPage() {
                       <span className="text-xs text-muted-foreground">Valor incluso na ida</span>
                     ) : (
                       <span className="font-semibold">
-                        {(finance.valueCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                        {(finance.valueCents / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}
                       </span>
                     )}
                   </div>
@@ -1375,10 +1379,10 @@ export default function ServicesPage() {
                     <div className="text-sm space-y-1">
                       <div>
                         <span className="text-muted-foreground">Despesas:</span>{" "}
-                        {(finance.expenseCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                        {(finance.expenseCents / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}
                       </div>
                       <div className={finance.resultCents < 0 ? "text-red-600 font-medium" : "text-green-600 font-medium"}>
-                        Resultado: {(finance.resultCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                        Resultado: {(finance.resultCents / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" })}
                       </div>
                     </div>
                   )}

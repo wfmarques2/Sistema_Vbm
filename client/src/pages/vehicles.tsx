@@ -31,8 +31,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useI18n } from "@/lib/i18n";
 
 export default function VehiclesPage() {
+  const { t } = useI18n();
   const { data: vehicles, isLoading } = useVehicles();
   const createMutation = useCreateVehicle();
   const updateMutation = useUpdateVehicle();
@@ -115,20 +117,20 @@ export default function VehiclesPage() {
     <Layout>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Veículos</h2>
-          <p className="text-muted-foreground">Gerencie sua frota.</p>
+          <h2 className="text-3xl font-display font-bold text-primary">{t("vehicles.title")}</h2>
+          <p className="text-muted-foreground">{t("vehicles.subtitle")}</p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => { setEditingId(null); form.reset(); }} className="bg-primary shadow-lg hover:shadow-primary/30">
               <Plus className="w-4 h-4 mr-2" />
-              Adicionar Veículo
+              {t("vehicles.add")}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingId ? "Editar Veículo" : "Adicionar Veículo"}</DialogTitle>
+              <DialogTitle>{editingId ? t("vehicles.edit") : t("vehicles.add")}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -242,7 +244,7 @@ export default function VehiclesPage() {
                   )}
                 />
                 <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
-                  {editingId ? "Atualizar Veículo" : "Criar Veículo"}
+                  {editingId ? t("vehicles.update") : t("vehicles.create")}
                 </Button>
               </form>
             </Form>
@@ -261,14 +263,14 @@ export default function VehiclesPage() {
               <TableHead>Capacidade de Malas</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+              <TableHead className="text-right">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-               <TableRow><TableCell colSpan={6} className="text-center py-8">Carregando veículos...</TableCell></TableRow>
+               <TableRow><TableCell colSpan={6} className="text-center py-8">{t("vehicles.loading")}</TableCell></TableRow>
             ) : vehicles?.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum veículo encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">{t("vehicles.empty")}</TableCell></TableRow>
             ) : (
               vehicles?.map((vehicle) => (
                 <TableRow key={vehicle.id} className="group hover:bg-muted/30 transition-colors">
@@ -290,7 +292,7 @@ export default function VehiclesPage() {
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-1">
                           <MoreHorizontal className="w-4 h-4" />
-                          Ações
+                          {t("common.actions")}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -300,7 +302,7 @@ export default function VehiclesPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDelete(vehicle.id)}>
                           <Trash2 className="w-4 h-4 text-red-600" />
-                          Excluir
+                          {t("common.delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

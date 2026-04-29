@@ -25,8 +25,11 @@ import { useListRevenues, useListUnifiedExpenses } from "@/hooks/use-financial";
 import { useUpdateService } from "@/hooks/use-services";
 import { useUpdateCompanyExpense, useUpdateVehicleExpense, useUpdateDriverPayment } from "@/hooks/use-financial";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/lib/i18n";
 
 export default function FinanceDashboardPage() {
+  const { language, t } = useI18n();
+  const locale = language === "es" ? "es-ES" : "pt-BR";
   const now = new Date();
   const [start, setStart] = useState<string>(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10));
   const [end, setEnd] = useState<string>(new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10));
@@ -34,20 +37,13 @@ export default function FinanceDashboardPage() {
   const [driverId, setDriverId] = useState<number | "">("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterMonth, setFilterMonth] = useState<string>(String(now.getMonth()));
-  const monthOptions = [
-    "Janeiro",
-    "Fevereiro",
-    "Março",
-    "Abril",
-    "Maio",
-    "Junho",
-    "Julho",
-    "Agosto",
-    "Setembro",
-    "Outubro",
-    "Novembro",
-    "Dezembro",
-  ];
+  const monthOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, month) =>
+        new Date(2026, month, 1).toLocaleString(locale, { month: "long" })
+      ),
+    [locale]
+  );
   const toDateInput = (d: Date) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -161,7 +157,7 @@ export default function FinanceDashboardPage() {
     entries.sort((a, b) => a.date.localeCompare(b.date));
     entries.forEach((d) => (d.lucro = d.receita - d.custos));
     return entries.map((d) => ({
-      date: new Date(d.date).toLocaleDateString("pt-BR"),
+      date: new Date(d.date).toLocaleDateString(locale),
       receita: (d.receita / 100),
       custos: (d.custos / 100),
       lucro: (d.lucro / 100),
@@ -306,7 +302,7 @@ export default function FinanceDashboardPage() {
     <Layout>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Dashboard Financeiro</h2>
+          <h2 className="text-3xl font-display font-bold text-primary">{t("financeDashboard.title")}</h2>
           <p className="text-muted-foreground">Métricas de receita, lucro e custos otimizadas para decisão.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -339,7 +335,7 @@ export default function FinanceDashboardPage() {
           </div>
           <Button variant="outline" className="gap-2" onClick={() => setShowFilters((s) => !s)}>
             <Filter className="w-4 h-4" />
-            {showFilters ? "Ocultar filtros" : "Filtros"}
+            {showFilters ? t("finance.common.hideFilters") : t("finance.common.filters")}
           </Button>
           <a
             href={(() => {
@@ -354,11 +350,11 @@ export default function FinanceDashboardPage() {
           >
             <Button variant="outline">
               <Download className="h-4 w-4 mr-2" />
-              Exportar CSV
+              {t("finance.common.exportCsv")}
             </Button>
           </a>
           <Button variant="secondary" onClick={exportExcel}>
-            Exportar Excel
+            {t("finance.common.exportExcel")}
           </Button>
         </div>
       </div>
@@ -366,7 +362,7 @@ export default function FinanceDashboardPage() {
       {showFilters && (
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Filtros</CardTitle>
+          <CardTitle>{t("finance.common.filters")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <DateQuickFilters
@@ -402,7 +398,7 @@ export default function FinanceDashboardPage() {
       </Card>
       )}
 
-      {isLoading && <div className="text-muted-foreground">Carregando...</div>}
+      {isLoading && <div className="text-muted-foreground">{t("finance.common.loading")}</div>}
       {isError && <div className="text-destructive">Erro ao carregar dados.</div>}
       {data && (
         <>
@@ -512,7 +508,7 @@ export default function FinanceDashboardPage() {
                     .slice(0, 5)
                     .map((s: any) => (
                       <div key={s.id} className="flex justify-between items-center py-1">
-                        <div className="text-sm">{new Date(s.dateTime).toLocaleDateString("pt-BR")} • {s.clientName} • {(Number(s.receitaConsolidadaCentavos || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div>
+                        <div className="text-sm">{new Date(s.dateTime).toLocaleDateString(locale)} • {s.clientName} • {(Number(s.receitaConsolidadaCentavos || 0) / 100).toLocaleString(locale, { style: "currency", currency: "BRL" })}</div>
                         <Button
                           size="sm"
                           variant="outline"
@@ -540,7 +536,7 @@ export default function FinanceDashboardPage() {
                     .map((e: any) => (
                       <div key={`${e.tipo}-${e.id}`} className="flex justify-between items-center py-1">
                         <div className="text-sm">
-                          {e.tipo === "company" ? "Empresa" : e.tipo === "vehicle" ? "Veículo" : "Motorista"} • {(Number(e.valorCentavos || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                          {e.tipo === "company" ? "Empresa" : e.tipo === "vehicle" ? "Veículo" : "Motorista"} • {(Number(e.valorCentavos || 0) / 100).toLocaleString(locale, { style: "currency", currency: "BRL" })}
                         </div>
                         <Button
                           size="sm"

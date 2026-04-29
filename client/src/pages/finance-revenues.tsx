@@ -4,15 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useListRevenues, useCreateRevenue, useDeleteRevenue } from "@/hooks/use-financial";
 import { useClients } from "@/hooks/use-clients";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError, redirectToLogin } from "@/lib/auth-utils";
 import { DateQuickFilters } from "@/components/date-quick-filters";
 import { Filter } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export default function FinanceRevenuesPage() {
+  const { language, t } = useI18n();
+  const locale = language === "es" ? "es-ES" : "pt-BR";
   const [start, setStart] = useState<string>("");
   const [end, setEnd] = useState<string>("");
   const { data: revenues } = useListRevenues({ start: start || undefined, end: end || undefined, sortOrder: "desc" });
@@ -30,20 +33,13 @@ export default function FinanceRevenuesPage() {
   const [dataRecebida, setDataRecebida] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterMonth, setFilterMonth] = useState<string>("all");
-  const monthOptions = [
-    "Janeiro",
-    "Fevereiro",
-    "Março",
-    "Abril",
-    "Maio",
-    "Junho",
-    "Julho",
-    "Agosto",
-    "Setembro",
-    "Outubro",
-    "Novembro",
-    "Dezembro",
-  ];
+  const monthOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, month) =>
+        new Date(2026, month, 1).toLocaleString(locale, { month: "long" })
+      ),
+    [locale]
+  );
   const toDateInput = (d: Date) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -114,14 +110,14 @@ export default function FinanceRevenuesPage() {
     <Layout>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-display font-bold text-primary">Receitas</h2>
-          <p className="text-muted-foreground">Entradas financeiras por serviços, outras origens e créditos de clientes.</p>
+          <h2 className="text-3xl font-display font-bold text-primary">{t("financeRevenues.title")}</h2>
+          <p className="text-muted-foreground">{t("financeRevenues.subtitle")}</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Adicionar Receita</CardTitle>
+          <CardTitle>{t("financeRevenues.add")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -158,7 +154,7 @@ export default function FinanceRevenuesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descrição (opcional)" />
             <Button onClick={addRevenue} disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Salvando..." : "Adicionar Receita"}
+              {createMutation.isPending ? "Salvando..." : t("financeRevenues.add")}
             </Button>
           </div>
         </CardContent>
@@ -166,7 +162,7 @@ export default function FinanceRevenuesPage() {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Receitas no Período</CardTitle>
+          <CardTitle>{t("financeRevenues.period")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-3 mb-3">
@@ -199,12 +195,12 @@ export default function FinanceRevenuesPage() {
             </div>
             <Button variant="outline" className="gap-2" onClick={() => setShowFilters((s) => !s)}>
               <Filter className="w-4 h-4" />
-              {showFilters ? "Ocultar filtros" : "Filtros"}
+              {showFilters ? t("finance.common.hideFilters") : t("finance.common.filters")}
             </Button>
             <div className="ml-auto text-right">
               <span className="text-sm text-muted-foreground">Total:</span>{" "}
               <span className="text-lg font-semibold">
-                {(total / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                {(total / 100).toLocaleString(locale, { style: "currency", currency: "BRL" })}
               </span>
             </div>
           </div>
@@ -242,7 +238,7 @@ export default function FinanceRevenuesPage() {
                       <TableCell>{r.tipo === "service" ? "Serviço" : r.tipo === "client_topup" ? "Saldo de Cliente" : "Outro"}</TableCell>
                       <TableCell>{r.descricao || "-"}</TableCell>
                       <TableCell>{r.metodoPagamento || "-"}</TableCell>
-                      <TableCell className="font-medium">{(r.valorCentavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
+                      <TableCell className="font-medium">{(r.valorCentavos / 100).toLocaleString(locale, { style: "currency", currency: "BRL" })}</TableCell>
                     </TableRow>
                     {isExpanded && (
                       <TableRow key={`details-${r.tipo}-${r.id}`} className="bg-muted/30">

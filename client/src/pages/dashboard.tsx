@@ -6,10 +6,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useI18n } from "@/lib/i18n";
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useStats();
   const { user } = useAuth();
+  const { t } = useI18n();
 
   if (isLoading) {
     return (
@@ -26,33 +28,33 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="mb-8">
-        <h2 className="text-3xl font-display font-bold text-primary">Painel</h2>
-        <p className="text-muted-foreground">Visão geral das operações de hoje.</p>
+        <h2 className="text-3xl font-display font-bold text-primary">{t("dashboard.title")}</h2>
+        <p className="text-muted-foreground">{t("dashboard.subtitle")}</p>
       </div>
 
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard 
-            title="Serviços de Hoje" 
+            title={t("dashboard.todayServices")} 
             value={stats.todayServices} 
             icon={Calendar} 
             trend="+12%" 
             trendUp={true}
           />
           <StatCard 
-            title="Receita Estimada (Hoje)" 
+            title={t("dashboard.estimatedRevenueToday")} 
             value={`R$${stats.estimatedRevenue.toFixed(2)}`} 
             icon={DollarSign} 
             trend="+5%" 
             trendUp={true}
           />
           <StatCard 
-            title="Motoristas Ativos" 
+            title={t("dashboard.activeDrivers")} 
             value={stats.activeDrivers} 
             icon={Users} 
           />
           <StatCard 
-            title="Veículos Disponíveis" 
+            title={t("dashboard.availableVehicles")} 
             value={stats.availableVehicles} 
             icon={Car} 
           />
@@ -62,10 +64,10 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-8">
         <Card className="border-none shadow-md">
           <CardHeader>
-            <CardTitle className="font-display">Ações Rápidas</CardTitle>
+            <CardTitle className="font-display">{t("dashboard.quickActions")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <p className="text-sm text-muted-foreground">Atalhos prioritários para as principais utilidades do sistema.</p>
+            <p className="text-sm text-muted-foreground">{t("dashboard.priorityShortcuts")}</p>
             
             <div className="space-y-2">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Operacional</div>

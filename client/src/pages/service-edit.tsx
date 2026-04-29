@@ -18,8 +18,11 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useI18n } from "@/lib/i18n";
 
 export default function ServiceEditPage() {
+  const { language, t } = useI18n();
+  const locale = language === "es" ? "es-ES" : "pt-BR";
   const [, params] = useRoute("/services/:id/edit");
   const isEdit = Boolean(params?.id);
   const id = params?.id ? Number(params.id) : 0;
@@ -224,7 +227,7 @@ export default function ServiceEditPage() {
       setDateTimeInput(format(new Date(service.dateTime), "yyyy-MM-dd'T'HH:mm"));
       setReturnInput(returnService?.dateTime ? format(new Date(returnService.dateTime), "yyyy-MM-dd'T'HH:mm") : "");
       setValueDisplay(
-        (isFinite(amount) ? amount : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+        (isFinite(amount) ? amount : 0).toLocaleString(locale, { style: "currency", currency: "BRL" })
       );
       const initialStopsCount = [
         service.stop1,
@@ -264,6 +267,22 @@ export default function ServiceEditPage() {
   const [newDepPhone, setNewDepPhone] = useState("");
   const [extraDependentId, setExtraDependentId] = useState<number>(0);
   const [extraPassengers, setExtraPassengers] = useState<Array<{ name: string; phone?: string }>>([]);
+  const clientNameSuggestions = useMemo(() => {
+    const seen = new Set<string>();
+    return (clients || [])
+      .map((c: any) => ({
+        id: Number(c.id),
+        name: String(c.name || "").trim(),
+        phone: String(c.phone || "").trim(),
+      }))
+      .filter((c) => {
+        if (!c.name) return false;
+        const key = c.name.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }, [clients]);
   useEffect(() => {
     const idNum = Number(selectedClientId);
     if (!clients || !Number.isFinite(idNum) || idNum <= 0) return;
@@ -537,8 +556,8 @@ export default function ServiceEditPage() {
   return (
     <Layout>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-display font-bold text-primary">{isEdit ? "Editar Serviço" : "Novo Serviço"}</h2>
-        <Button variant="outline" onClick={() => navigate("/services")}>Voltar</Button>
+        <h2 className="text-2xl font-display font-bold text-primary">{isEdit ? t("services.editTitle") : t("services.newTitle")}</h2>
+        <Button variant="outline" onClick={() => navigate("/services")}>{t("common.back")}</Button>
       </div>
       <div className="max-w-4xl">
         <Form {...form}>
@@ -547,24 +566,44 @@ export default function ServiceEditPage() {
               <h3 className="text-sm font-semibold text-primary">Cliente e Passageiros</h3>
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="clientName" render={({ field }) => (
-                  <FormItem><FormLabel>Nome do Cliente</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel>Nome do Cliente</FormLabel>
+                    <FormControl>
+                      <Input
+                        value={field.value ?? ""}
+                        list="service-client-name-suggestions"
+                        onChange={(e) => {
+                          const typedName = e.target.value;
+                          field.onChange(typedName);
+                          const normalizedTyped = typedName.trim().toLowerCase();
+                          const matched = clientNameSuggestions.find(
+                            (c) => c.name.toLowerCase() === normalizedTyped
+                          );
+                          if (matched) {
+                            form.setValue("clientId", String(matched.id), { shouldDirty: true });
+                            if (!String(form.getValues("clientPhone") || "").trim()) {
+                              form.setValue("clientPhone", matched.phone, { shouldDirty: true });
+                            }
+                          } else {
+                            form.setValue("clientId", "", { shouldDirty: true });
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <datalist id="service-client-name-suggestions">
+                      {clientNameSuggestions.map((c) => (
+                        <option key={c.id} value={c.name}>
+                          {c.phone}
+                        </option>
+                      ))}
+                    </datalist>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="clientPhone" render={({ field }) => (
                   <FormItem><FormLabel>Telefone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-              <FormField control={form.control} name="clientId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cliente (cadastrado)</FormLabel>
-                  <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecionar cliente" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {clients?.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name} ({c.phone})</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
               {Number(selectedClientId || 0) > 0 && (
                 <div className="space-y-3 rounded-md border border-border/60 p-3">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1096,7 +1135,7 @@ export default function ServiceEditPage() {
                       const digits = e.target.value.replace(/\D/g, "");
                       const cents = digits ? parseInt(digits, 10) : 0;
                       const amount = cents / 100;
-                      setValueDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                      setValueDisplay(amount.toLocaleString(locale, { style: "currency", currency: "BRL" }));
                       form.setValue("value", amount.toFixed(2));
                     }} />
                   </FormControl>
@@ -1135,7 +1174,7 @@ export default function ServiceEditPage() {
                       const digits = e.target.value.replace(/\D/g, "");
                       const cents = digits ? parseInt(digits, 10) : 0;
                       const amount = cents / 100;
-                      setValorParcialDisplay(amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }));
+                      setValorParcialDisplay(amount.toLocaleString(locale, { style: "currency", currency: "BRL" }));
                     }}
                     placeholder="R$ 0,00"
                   />

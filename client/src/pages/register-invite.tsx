@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useI18n } from "@/lib/i18n";
 
 const registerSchema = z.object({
   firstName: z.string().min(2, "Nome muito curto"),
@@ -20,6 +21,7 @@ const registerSchema = z.object({
 });
 
 export default function RegisterInvitePage() {
+  const { t } = useI18n();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [invitation, setInvitation] = useState<any>(null);
@@ -106,8 +108,8 @@ export default function RegisterInvitePage() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-destructive">Convite Inválido</CardTitle>
-            <CardDescription>O link que você acessou é inválido ou expirou.</CardDescription>
+            <CardTitle className="text-destructive">{t("registerInvite.invalidTitle")}</CardTitle>
+            <CardDescription>{t("registerInvite.invalidSubtitle")}</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -118,9 +120,9 @@ export default function RegisterInvitePage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Bem-vindo(a) à VBM Transfer</CardTitle>
+          <CardTitle>{t("registerInvite.welcomeTitle")}</CardTitle>
           <CardDescription>
-            Complete seu cadastro para acessar o sistema.
+            {t("registerInvite.welcomeSubtitle")}
             <br />
             Email: <strong>{invitation.email}</strong>
           </CardDescription>
@@ -183,7 +185,7 @@ export default function RegisterInvitePage() {
                 )}
               />
               <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? "Criando conta..." : "Criar Conta"}
+                {form.formState.isSubmitting ? t("registerInvite.creatingAccount") : t("registerInvite.createAccount")}
               </Button>
             </form>
           </Form>
