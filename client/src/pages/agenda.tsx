@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Clock, MapPin, ChevronLeft as BackIcon, CircleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, MapPin, ChevronLeft as BackIcon, CircleAlert, CheckCircle2 } from "lucide-react";
 import { SiWaze, SiGooglemaps, SiWhatsapp } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -105,6 +105,7 @@ export default function AgendaPage() {
     .sort((a: AgendaServiceItem, b: AgendaServiceItem) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
 
   const [openServiceId, setOpenServiceId] = useState<string | null>(null);
+  const [completionFxServiceId, setCompletionFxServiceId] = useState<number | null>(null);
   const updateMutation = useUpdateService();
   const [savingCosts, setSavingCosts] = useState(false);
   const [costs, setCosts] = useState<any>({
@@ -424,7 +425,10 @@ export default function AgendaPage() {
       <Dialog
         open={openServiceId != null}
         onOpenChange={(v) => {
-          if (!v) setOpenServiceId(null);
+          if (!v) {
+            setOpenServiceId(null);
+            setCompletionFxServiceId(null);
+          }
         }}
       >
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto bg-background text-foreground border border-border">
@@ -467,9 +471,16 @@ export default function AgendaPage() {
               : destinationPhase
               ? "finished"
               : null;
-            const canFinish = s.status === "driving_destination" || String(s.status) === "in_progress";
             const isFinished = s.status === "finished";
+            const canFinish = !isFinished;
             const canCancel = !isFinished;
+            const hasIncompleteFlow =
+              !isFinished &&
+              (String(s.status) === "scheduled" ||
+                String(s.status) === "driving_pickup" ||
+                String(s.status) === "pickup_location" ||
+                hasPendingStops);
+            const showCompletionFx = completionFxServiceId === serviceId;
             const statusClass =
               s.status === "finished" ? "bg-green-100 text-green-700" :
               s.status === "driving_pickup" ? "bg-yellow-100 text-yellow-700" :
@@ -524,7 +535,16 @@ export default function AgendaPage() {
                     <span>Serviço #{String(s.id).padStart(6, "0")}{isReturnItem ? " • Retorno" : ""}</span>
                   </button>
                 </div>
-                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                <div className="relative rounded-xl border border-border bg-card p-4 shadow-sm overflow-hidden">
+                  {showCompletionFx && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-emerald-500/15 backdrop-blur-[1px] animate-in fade-in duration-200">
+                      <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/20 px-6 py-4 text-center shadow-lg animate-in zoom-in-95 duration-300">
+                        <CheckCircle2 className="w-12 h-12 mx-auto mb-2 text-emerald-400 animate-bounce" />
+                        <div className="text-lg font-bold text-emerald-200">Viagem concluída</div>
+                        <div className="text-sm text-emerald-100/90">Status finalizado com sucesso.</div>
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-2 text-sm">
                     <div><span className="font-semibold text-primary">Cliente:</span> {s.clientName}</div>
                     <div><span className="font-semibold text-primary">Motorista:</span> {tripDriver}</div>
@@ -629,7 +649,7 @@ export default function AgendaPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3 mt-4">
                     <Button 
-                      disabled={!canAdvance || !nextStatus || updateMutation.isPending}
+                      disabled={!canAdvance || !nextStatus || updateMutation.isPending || showCompletionFx}
                       onClick={async () => {
                         if (destinationPhase && nextStopNumber) {
                           const ok = window.confirm(`Deseja avançar para a parada ${nextStopNumber}?`);
@@ -658,9 +678,12 @@ export default function AgendaPage() {
                         : "Sem próximo status"}
                     </Button>
                     <Button 
-                      disabled={!canFinish || updateMutation.isPending}
+                      disabled={!canFinish || updateMutation.isPending || showCompletionFx}
                       onClick={async () => {
-                        const ok = window.confirm("Deseja concluir a viagem? Confirme custos e KM real antes.");
+                        const confirmMsg = hasIncompleteFlow
+                          ? "Atenção: a viagem ainda não passou por todas as etapas. Deseja realmente concluir agora?"
+                          : "Deseja concluir a viagem? Confirme custos e KM real antes.";
+                        const ok = window.confirm(confirmMsg);
                         if (!ok) return;
                         await saveCosts(serviceId);
                         // Registrar KM no log (se informado)
@@ -682,7 +705,10 @@ export default function AgendaPage() {
                         }
                         await updateMutation.mutateAsync({ id: serviceId, status: "finished" });
                         clearServiceStopProgress(serviceId);
-                        setOpenServiceId(null);
+                        setCompletionFxServiceId(serviceId);
+                        window.setTimeout(() => {
+                          setCompletionFxServiceId(null);
+                        }, 1400);
                       }}
                       variant="secondary"
                       className="bg-secondary text-secondary-foreground hover:bg-secondary/80"

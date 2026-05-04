@@ -352,29 +352,7 @@ export default function ServicesPage() {
   });
   const displayServices = useMemo(() => {
     const rows = filteredServices || [];
-    const parents = rows.filter((s: any) => !s.isReturn);
-    const grouped = new Map<number, any[]>();
-    rows
-      .filter((s: any) => s.isReturn && s.parentServiceId)
-      .forEach((s: any) => {
-        const key = Number(s.parentServiceId);
-        const arr = grouped.get(key) || [];
-        arr.push(s);
-        grouped.set(key, arr);
-      });
-    const result: any[] = [];
-    for (const parent of parents) {
-      result.push(parent);
-      const childs = (grouped.get(Number(parent.id)) || []).sort(
-        (a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
-      );
-      result.push(...childs);
-    }
-    const parentIds = new Set(parents.map((s: any) => Number(s.id)));
-    const orphans = rows
-      .filter((s: any) => s.isReturn && (!s.parentServiceId || !parentIds.has(Number(s.parentServiceId))))
-      .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
-    return [...result, ...orphans];
+    return [...rows].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
   }, [filteredServices]);
   const servicesById = useMemo(() => {
     const map = new Map<number, any>();
@@ -1012,25 +990,16 @@ export default function ServicesPage() {
               <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">{t("services.empty")}</TableCell></TableRow>
             ) : (
               displayServices.map((service, index) => {
-                const prevService = index > 0 ? displayServices[index - 1] : null;
-                const nextService = index < displayServices.length - 1 ? displayServices[index + 1] : null;
-                const isAttachedReturn = Boolean(
-                  service.isReturn &&
-                  prevService &&
-                  Number(service.parentServiceId || 0) === Number(prevService.id || 0)
-                );
-                const hasLinkedReturn = Boolean(
-                  !service.isReturn &&
-                  nextService &&
-                  nextService.isReturn &&
-                  Number(nextService.parentServiceId || 0) === Number(service.id || 0)
-                );
+                const linkedReturns = returnServicesByParent.get(Number(service.id)) || [];
+                const hasLinkedReturn = !service.isReturn && linkedReturns.length > 0;
+                const parentId = Number(service.parentServiceId || 0);
+                const parentService = service.isReturn ? servicesById.get(parentId) : null;
                 const finance = getFinancialView(service);
                 return (
                 <>
                 <TableRow 
                   key={`main-${service.id}`} 
-                  className={`group hover:bg-muted/30 transition-colors cursor-pointer ${service.isReturn ? "bg-sky-50 hover:bg-sky-100 dark:bg-[#253744] dark:hover:bg-[#2c4352]" : ""} ${hasLinkedReturn ? "bg-cyan-50/60 border-b-cyan-300/70 dark:bg-[#1e2f39]/40 dark:border-b-cyan-700/50" : ""} ${isAttachedReturn ? "border-t-0" : ""}`}
+                  className={`group hover:bg-muted/30 transition-colors cursor-pointer ${service.isReturn ? "bg-amber-50/70 hover:bg-amber-100/80 dark:bg-[#3a2c1c]/45 dark:hover:bg-[#4a3720]/55" : ""} ${hasLinkedReturn ? "bg-cyan-50/50 dark:bg-[#1e2f39]/30" : ""}`}
                   onClick={() => handleEdit(service)}
                 >
                   <TableCell className="w-10">
@@ -1043,24 +1012,42 @@ export default function ServicesPage() {
                       <ChevronDown className={`w-4 h-4 transition-transform ${expandedId === service.id ? "rotate-180" : ""}`} />
                     </Button>
                   </TableCell>
-                  <TableCell className={`font-mono text-xs text-muted-foreground ${service.isReturn ? "pl-6" : ""}`}>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
-                      <span>{service.isReturn ? "↳ " : ""}#{String(service.id).padStart(4, "0")}</span>
-                      {hasLinkedReturn && <Badge variant="outline" className="text-[10px] border-cyan-700/60 text-cyan-300">IDA+RETORNO</Badge>}
-                      {isAttachedReturn && <Badge variant="outline" className="text-[10px] border-cyan-700/60 text-cyan-300">RETORNO</Badge>}
+                      <span>#{String(service.id).padStart(4, "0")}</span>
+                      {service.isReturn && parentId > 0 && (
+                        <Badge variant="outline" className="text-[10px] border-amber-600/70 text-amber-700 dark:text-amber-300">
+                          RETORNO DA IDA #{String(parentId).padStart(4, "0")}
+                        </Badge>
+                      )}
+                      {hasLinkedReturn && (
+                        <Badge variant="outline" className="text-[10px] border-cyan-700/60 text-cyan-700 dark:text-cyan-300">
+                          POSSUI RETORNO
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
-                  <TableCell className={service.isReturn ? "pl-6" : ""}>
+                  <TableCell>
                     <div className="flex flex-col">
                       <span className="font-medium">{format(new Date(service.dateTime), 'dd/MM/yyyy', { locale: dateLocale })}</span>
                       <span className="text-xs text-muted-foreground">{format(new Date(service.dateTime), 'HH:mm', { locale: dateLocale })}</span>
                     </div>
                   </TableCell>
-                  <TableCell className={service.isReturn ? "pl-6" : ""}>
+                  <TableCell>
                     <div className="flex flex-col">
                       <span className="font-medium">
                         {formatPassengerNames(service.clientName)}{service.isReturn ? " • Retorno" : ""}
                       </span>
+                      {service.isReturn && parentService && (
+                        <span className="text-[11px] text-amber-700 dark:text-amber-300">
+                          Referência: ida de {format(new Date(parentService.dateTime), 'dd/MM/yyyy HH:mm', { locale: dateLocale })}
+                        </span>
+                      )}
+                      {hasLinkedReturn && (
+                        <span className="text-[11px] text-cyan-700 dark:text-cyan-300">
+                          Retorno(s): {(linkedReturns || []).map((r: any) => `#${String(r.id).padStart(4, "0")}`).join(", ")}
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground">{service.clientPhone}</span>
                     </div>
                   </TableCell>
@@ -1242,22 +1229,13 @@ export default function ServicesPage() {
             <div className="text-center py-8 text-muted-foreground">{t("services.empty")}</div>
           ) : (
             displayServices.map((service, index) => {
-              const prevService = index > 0 ? displayServices[index - 1] : null;
-              const nextService = index < displayServices.length - 1 ? displayServices[index + 1] : null;
-              const isAttachedReturn = Boolean(
-                service.isReturn &&
-                prevService &&
-                Number(service.parentServiceId || 0) === Number(prevService.id || 0)
-              );
-              const hasLinkedReturn = Boolean(
-                !service.isReturn &&
-                nextService &&
-                nextService.isReturn &&
-                Number(nextService.parentServiceId || 0) === Number(service.id || 0)
-              );
+              const linkedReturns = returnServicesByParent.get(Number(service.id)) || [];
+              const hasLinkedReturn = !service.isReturn && linkedReturns.length > 0;
+              const parentId = Number(service.parentServiceId || 0);
+              const parentService = service.isReturn ? servicesById.get(parentId) : null;
               const finance = getFinancialView(service);
               return (
-              <div key={`card-${service.id}`} className={`rounded-lg border bg-card p-3 ${isAttachedReturn ? "ml-4 border-l-4 border-l-cyan-500 dark:border-l-cyan-500" : ""} ${service.isReturn ? "bg-sky-50 border-cyan-300/60 dark:bg-[#253744] dark:border-cyan-800/60" : ""} ${hasLinkedReturn ? "bg-cyan-50/60 border-b-cyan-300/70 dark:bg-[#1e2f39]/40 dark:border-b-cyan-700/50" : ""}`}>
+              <div key={`card-${service.id}`} className={`rounded-lg border bg-card p-3 ${service.isReturn ? "border-l-4 border-l-amber-500 bg-amber-50/70 dark:bg-[#3a2c1c]/45 dark:border-l-amber-500" : ""} ${hasLinkedReturn ? "bg-cyan-50/40 dark:bg-[#1e2f39]/30" : ""}`}>
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="text-xs text-muted-foreground">#{String(service.id).padStart(4, "0")}</div>
@@ -1265,8 +1243,16 @@ export default function ServicesPage() {
                       {format(new Date(service.dateTime), 'dd/MM/yyyy HH:mm', { locale: dateLocale })}{service.isReturn ? " • Retorno" : ""}
                     </div>
                     <div className="mt-1">
-                      {hasLinkedReturn && <Badge variant="outline" className="text-[10px] border-cyan-700/60 text-cyan-300">IDA+RETORNO</Badge>}
-                      {isAttachedReturn && <Badge variant="outline" className="text-[10px] border-cyan-700/60 text-cyan-300">RETORNO</Badge>}
+                      {service.isReturn && parentId > 0 && (
+                        <Badge variant="outline" className="text-[10px] border-amber-600/70 text-amber-700 dark:text-amber-300">
+                          RETORNO DA IDA #{String(parentId).padStart(4, "0")}
+                        </Badge>
+                      )}
+                      {hasLinkedReturn && (
+                        <Badge variant="outline" className="text-[10px] border-cyan-700/60 text-cyan-700 dark:text-cyan-300">
+                          POSSUI RETORNO
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <DropdownMenu>
@@ -1342,6 +1328,16 @@ export default function ServicesPage() {
                 </div>
                 <div className="mt-2">
                   <div className="text-sm font-medium">{formatPassengerNames(service.clientName)}</div>
+                  {service.isReturn && parentService && (
+                    <div className="text-[11px] text-amber-700 dark:text-amber-300">
+                      Referência da ida: #{String(parentService.id).padStart(4, "0")} em {format(new Date(parentService.dateTime), 'dd/MM/yyyy HH:mm', { locale: dateLocale })}
+                    </div>
+                  )}
+                  {hasLinkedReturn && (
+                    <div className="text-[11px] text-cyan-700 dark:text-cyan-300">
+                      Retorno(s): {(linkedReturns || []).map((r: any) => `#${String(r.id).padStart(4, "0")}`).join(", ")}
+                    </div>
+                  )}
                   <div className="text-xs text-muted-foreground">{service.clientPhone}</div>
                 </div>
                 <div className="mt-2 text-sm">

@@ -70,48 +70,48 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground">{t("dashboard.priorityShortcuts")}</p>
             
             <div className="space-y-2">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Operacional</div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">{t("dashboard.sectionOperational")}</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <Link href="/services/new">
                 <div className="nav-item w-full rounded-lg">
                   <Calendar className="w-4 h-4" />
-                  <span>Agendar Novo Transfer</span>
+                  <span>{t("dashboard.quick.scheduleTransfer")}</span>
                 </div>
               </Link>
                 <Link href="/agenda">
                   <div className="nav-item w-full rounded-lg">
                     <CalendarDays className="w-4 h-4" />
-                    <span>Ver Agenda</span>
+                    <span>{t("dashboard.quick.viewAgenda")}</span>
                   </div>
                 </Link>
                 <Link href="/reports">
                   <div className="nav-item w-full rounded-lg">
                     <FileText className="w-4 h-4" />
-                    <span>Relatórios de Serviços</span>
+                    <span>{t("dashboard.quick.serviceReports")}</span>
                   </div>
                 </Link>
               </div>
             </div>
 
             <div className="space-y-2">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Cadastros</div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">{t("dashboard.sectionRegistries")}</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <Link href="/clients?new=1">
                   <div className="nav-item w-full rounded-lg">
                     <UserPlus className="w-4 h-4" />
-                    <span>Cadastrar Cliente</span>
+                    <span>{t("dashboard.quick.registerClient")}</span>
                   </div>
                 </Link>
               <Link href="/drivers?new=1">
                 <div className="nav-item w-full rounded-lg">
                   <Users className="w-4 h-4" />
-                  <span>Cadastrar Novo Motorista</span>
+                  <span>{t("dashboard.quick.registerDriver")}</span>
                 </div>
               </Link>
               <Link href="/vehicles?new=1">
                 <div className="nav-item w-full rounded-lg">
                   <Car className="w-4 h-4" />
-                  <span>Adicionar Veículo à Frota</span>
+                  <span>{t("dashboard.quick.addVehicle")}</span>
                 </div>
               </Link>
               </div>
@@ -119,30 +119,30 @@ export default function Dashboard() {
 
             {user?.role === "admin" && (
               <div className="space-y-2">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">Financeiro</div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">{t("dashboard.sectionFinancial")}</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <Link href="/finance/expenses/create">
                     <div className="nav-item w-full rounded-lg">
                       <Receipt className="w-4 h-4" />
-                      <span>Registrar Despesa</span>
+                      <span>{t("dashboard.quick.registerExpense")}</span>
                     </div>
                   </Link>
                   <Link href="/finance/revenues">
                     <div className="nav-item w-full rounded-lg">
                       <DollarSign className="w-4 h-4" />
-                      <span>Registrar Recebimento</span>
+                      <span>{t("dashboard.quick.registerRevenue")}</span>
                     </div>
                   </Link>
                   <Link href="/finance/dashboard">
                     <div className="nav-item w-full rounded-lg">
                       <LayoutDashboard className="w-4 h-4" />
-                      <span>Painel Financeiro</span>
+                      <span>{t("dashboard.quick.financeDashboard")}</span>
                     </div>
                   </Link>
                   <Link href="/finance/reports">
                     <div className="nav-item w-full rounded-lg">
                       <FileText className="w-4 h-4" />
-                      <span>Relatórios Financeiros</span>
+                      <span>{t("dashboard.quick.financeReports")}</span>
                     </div>
                   </Link>
                 </div>
