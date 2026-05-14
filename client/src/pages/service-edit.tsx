@@ -103,6 +103,7 @@ export default function ServiceEditPage() {
     stop3: z.string().nullable().optional(),
     stop4: z.string().nullable().optional(),
     stop5: z.string().nullable().optional(),
+    showValueOnVoucher: z.boolean().optional(),
   });
 
   const form = useForm<z.infer<typeof serviceFormSchema>>({
@@ -151,6 +152,7 @@ export default function ServiceEditPage() {
       paxInf: "",
       paxSen: "",
       paxFree: "",
+      showValueOnVoucher: false,
     },
   });
 
@@ -223,6 +225,7 @@ export default function ServiceEditPage() {
         tempoEstimado: service.tempoEstimado != null ? String(service.tempoEstimado) : "",
         guide: service.guide ?? "",
         restanteMetodoDriver: service.restanteMetodoDriver ?? undefined,
+        showValueOnVoucher: service.showValueOnVoucher ?? false,
       });
       setDateTimeInput(format(new Date(service.dateTime), "yyyy-MM-dd'T'HH:mm"));
       setReturnInput(returnService?.dateTime ? format(new Date(returnService.dateTime), "yyyy-MM-dd'T'HH:mm") : "");
@@ -416,6 +419,7 @@ export default function ServiceEditPage() {
       returnVehicleId: undefined,
       guide: values.guide ? String(values.guide).trim() : undefined,
       flight: values.flight ? String(values.flight).trim() : undefined,
+      showValueOnVoucher: values.showValueOnVoucher,
       passengers: passengersFinal || undefined,
       bags: Number(values.bags ?? 0) || undefined,
       paxAdt: Number(values.paxAdt ?? 0) || undefined,
@@ -472,6 +476,7 @@ export default function ServiceEditPage() {
               kmPrevisto: values.returnKmPrevisto != null && values.returnKmPrevisto !== "" ? String(values.returnKmPrevisto).replace(",", ".") : undefined,
               tempoEstimado: values.returnTempoEstimado ? String(values.returnTempoEstimado).trim() : undefined,
               guide: values.guide ? String(values.guide).trim() : undefined,
+              showValueOnVoucher: values.showValueOnVoucher,
               notes: values.notes ? String(values.notes).trim() : undefined,
               passengers: passengersFinal || undefined,
               bags: Number(values.bags ?? 0) || undefined,
@@ -1224,6 +1229,27 @@ export default function ServiceEditPage() {
                 </FormItem>
               )} />
               <div />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="showValueOnVoucher"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Exibir o valor da viagem no voucher
+                      </FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="driverId" render={({ field }) => (

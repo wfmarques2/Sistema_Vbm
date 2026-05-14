@@ -1,6 +1,5 @@
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
 import { useFinancialReport, useListUnifiedExpenses } from "@/hooks/use-financial";
@@ -390,7 +389,7 @@ export default function FinanceReportsPage() {
       { header: "Centro", key: "centro", width: 22 },
       { header: "Valor", key: "valor", width: 14 },
     ];
-    (expenses || []).forEach((r: any) => {
+    (expenses?.rows || []).forEach((r: any) => {
       despesasWs.addRow({
         id: r.id,
         tipo: r.tipo === "vehicle" ? "Veículo" : r.tipo === "company" ? "Empresa" : "Motorista",
@@ -641,7 +640,7 @@ export default function FinanceReportsPage() {
           {!enabled && <div className="text-muted-foreground">Informe início e fim para listar.</div>}
           {isLoadingExpenses && <div className="text-muted-foreground">{t("finance.common.loading")}</div>}
           {isErrorExpenses && <div className="text-destructive">Erro ao carregar despesas.</div>}
-          {expenses && (
+          {expenses && expenses.rows.length > 0 && (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -654,7 +653,7 @@ export default function FinanceReportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expenses.map((r) => (
+                {expenses.rows.map((r: any) => (
                   <TableRow key={`${r.tipo}-${r.id}`}>
                     <TableCell>{r.id}</TableCell>
                     <TableCell>{r.tipo === "vehicle" ? "Veículo" : r.tipo === "company" ? "Empresa" : "Motorista"}</TableCell>

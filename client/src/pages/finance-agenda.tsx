@@ -40,16 +40,17 @@ export default function FinanceAgendaPage() {
   const { data: vehicle } = useListVehicleExpenses({ start, end, active: true, sortBy: "ocorridaEm", sortOrder: "asc" });
   const { mutateAsync: createCompanyExpense } = useCreateCompanyExpense();
   const deleteUnified = useDeleteUnifiedExpense();
+  const unifiedRows = unified?.rows || [];
 
   const upcoming = useMemo(() => {
-    const uni = (unified || []).filter((r: any) => r.tipo !== "service");
+    const uni = unifiedRows.filter((r: any) => r.tipo !== "service");
     if (uni.length > 0) {
       return uni.sort((a: any, b: any) => new Date(a.ocorridaEm).getTime() - new Date(b.ocorridaEm).getTime());
     }
     const c = (company || []).map((e) => ({ tipo: "company" as const, ...e }));
     const v = (vehicle || []).map((e) => ({ tipo: "vehicle" as const, ...e }));
     return [...c, ...v].sort((a: any, b: any) => new Date(a.ocorridaEm ?? a.createdAt).getTime() - new Date(b.ocorridaEm ?? b.createdAt).getTime());
-  }, [unified, company, vehicle]);
+  }, [unifiedRows, company, vehicle]);
 
   const scheduleNextMonth = async (e: any) => {
     const nextDate = addMonths(new Date(e.ocorridaEm), 1);

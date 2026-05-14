@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { addMonths } from "date-fns";
 import { useListUnifiedExpenses, useCreateUnifiedExpense, useDeleteUnifiedExpense, useUpdateCompanyExpense, useUpdateVehicleExpense } from "@/hooks/use-financial";
 import { Trash2, Filter } from "lucide-react";
@@ -241,7 +241,7 @@ function UnifiedExpensesTab() {
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   };
-  const { data: unifiedRows, isLoading: isLoadingUnified, isError: isErrorUnified, refetch: refetchUnified } = useListUnifiedExpenses({
+  const { data: unifiedData, isLoading: isLoadingUnified, isError: isErrorUnified, refetch: refetchUnified } = useListUnifiedExpenses({
     start: uStart || undefined,
     end: uEnd || undefined,
     tipo: uTipo || undefined,
@@ -254,6 +254,17 @@ function UnifiedExpensesTab() {
     offset: uOffset,
     sortOrder: uSortOrder,
   });
+  const unifiedRows = unifiedData?.rows || [];
+  const totalRows = unifiedData?.total || 0;
+  const hasPreviousPage = uOffset > 0;
+  const hasNextPage = uOffset + unifiedRows.length < totalRows;
+  const currentPage = Math.floor(uOffset / uLimit) + 1;
+  const totalPages = Math.max(1, Math.ceil(totalRows / uLimit));
+
+  useEffect(() => {
+    setUOffset(0);
+  }, [uStart, uEnd, uTipo, uCategoria, uVehicleId, uDriverId, uServiceId, uStatus, uSortOrder, uLimit]);
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -332,8 +343,8 @@ function UnifiedExpensesTab() {
           </Select>
           <Input type="number" value={uLimit} onChange={(e) => setULimit(Number(e.target.value) || 50)} placeholder="Limite" />
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setUOffset(Math.max(0, uOffset - uLimit))}>Anterior</Button>
-            <Button variant="outline" onClick={() => setUOffset(uOffset + uLimit)}>Próximo</Button>
+            <Button variant="outline" onClick={() => setUOffset(Math.max(0, uOffset - uLimit))} disabled={!hasPreviousPage}>Anterior</Button>
+            <Button variant="outline" onClick={() => setUOffset(uOffset + uLimit)} disabled={!hasNextPage}>Próximo</Button>
           </div>
         </div>
         <Button onClick={() => refetchUnified()} disabled={isLoadingUnified}>Filtrar</Button>
@@ -341,7 +352,16 @@ function UnifiedExpensesTab() {
       )}
       {isLoadingUnified && <div className="text-muted-foreground mt-4">Carregando...</div>}
       {isErrorUnified && <div className="text-destructive mt-4">Erro ao carregar despesas unificadas.</div>}
-      {unifiedRows && (
+      {!!unifiedData && (
+        <>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+          <div>
+            Mostrando <span className="font-medium">{unifiedRows.length}</span> de <span className="font-medium">{totalRows}</span> despesa(s)
+          </div>
+          <div>
+            Página <span className="font-medium">{currentPage}</span> de <span className="font-medium">{totalPages}</span>
+          </div>
+        </div>
         <Table className="mt-4">
           <TableHeader>
             <TableRow>
@@ -361,6 +381,15 @@ function UnifiedExpensesTab() {
             ))}
           </TableBody>
         </Table>
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <Button variant="outline" onClick={() => setUOffset(Math.max(0, uOffset - uLimit))} disabled={!hasPreviousPage}>
+            Anterior
+          </Button>
+          <Button variant="outline" onClick={() => setUOffset(uOffset + uLimit)} disabled={!hasNextPage}>
+            Próximo
+          </Button>
+        </div>
+        </>
       )}
     </>
   );
@@ -588,6 +617,7 @@ function UnifiedExpenseCreate({ drivers, vehicles, createUnified }: { drivers: a
               <SelectItem value="cash">Dinheiro</SelectItem>
               <SelectItem value="credit_card">Cartão crédito</SelectItem>
               <SelectItem value="debit_card">Cartão débito</SelectItem>
+              <SelectItem value="saldo">Saldo</SelectItem>
               <SelectItem value="mozio">MOZIO</SelectItem>
             </SelectContent>
           </Select>

@@ -64,7 +64,7 @@ const revenueSchema = z.object({
   tipo: z.enum(["service","manual","client_topup"]),
   ocorridaEm: z.string(),
   valorCentavos: z.number(),
-  metodoPagamento: z.enum(["pix","cash","credit_card","debit_card","saldo"]).nullable().optional(),
+  metodoPagamento: z.enum(["pix","cash","credit_card","debit_card","saldo","mozio"]).nullable().optional(),
   clientId: z.number().nullable().optional(),
   serviceId: z.number().nullable().optional(),
   descricao: z.string().nullable().optional(),
@@ -404,8 +404,8 @@ const driverPaymentSchema = z.object({
   driverId: z.number(),
   serviceId: z.number().nullable().optional(),
   valorCentavos: z.number(),
-  metodoPagamento: z.enum(["pix","cash","credit_card","debit_card"]).nullable().optional(),
-  statusPagamento: z.enum(["pending", "paid", "saldo", "partial", "overdue", "canceled"]).optional(),
+  metodoPagamento: z.enum(["pix","cash","credit_card","debit_card","saldo","mozio"]).nullable().optional(),
+  statusPagamento: z.enum(["pending", "paid", "saldo", "partial", "overdue", "canceled", "pay_driver"]).optional(),
   periodoInicio: z.string().nullable().optional(),
   periodoFim: z.string().nullable().optional(),
   pagoEm: z.string().nullable().optional(),
@@ -488,46 +488,53 @@ const unifiedExpenseSchema = z.discriminatedUnion("tipo", [
   z.object({
     id: z.number(),
     tipo: z.literal("vehicle"),
-    ocorridaEm: z.string(),
-    categoria: z.string(),
-    valorCentavos: z.number(),
+    ocorridaEm: z.any(),
+    categoria: z.string().nullable().optional(),
+    valorCentavos: z.coerce.number(),
     descricao: z.string().nullable().optional(),
-    vehicleId: z.number(),
+    vehicleId: z.number().nullable().optional(),
     serviceId: z.number().nullable().optional(),
-  statusPagamento: z.enum(["pending","paid","saldo","partial","overdue","canceled","pay_driver"]).nullable().optional(),
-    active: z.boolean(),
+    statusPagamento: z.string().nullable().optional(),
+    active: z.boolean().nullable().optional(),
   }),
   z.object({
     id: z.number(),
     tipo: z.literal("company"),
-    ocorridaEm: z.string(),
-    categoria: z.string(),
-    valorCentavos: z.number(),
+    ocorridaEm: z.any(),
+    categoria: z.string().nullable().optional(),
+    valorCentavos: z.coerce.number(),
     descricao: z.string().nullable().optional(),
     pagoPara: z.string().nullable().optional(),
-  statusPagamento: z.enum(["pending","paid","saldo","partial","overdue","canceled","pay_driver"]).nullable().optional(),
-    active: z.boolean(),
+    statusPagamento: z.string().nullable().optional(),
+    active: z.boolean().nullable().optional(),
   }),
   z.object({
     id: z.number(),
     tipo: z.literal("driver_payment"),
-    ocorridaEm: z.string(),
-    valorCentavos: z.number(),
-    driverId: z.number(),
+    ocorridaEm: z.any(),
+    valorCentavos: z.coerce.number(),
+    driverId: z.number().nullable().optional(),
     serviceId: z.number().nullable().optional(),
-  statusPagamento: z.enum(["pending","paid","saldo","partial","overdue","canceled","pay_driver"]).nullable().optional(),
-  metodoPagamento: z.enum(["pix","cash","credit_card","debit_card"]).nullable().optional(),
+    statusPagamento: z.string().nullable().optional(),
+    metodoPagamento: z.string().nullable().optional(),
     observacao: z.string().nullable().optional(),
   }),
   z.object({
     id: z.number(),
     tipo: z.literal("service"),
-    ocorridaEm: z.string(),
-    categoria: z.string(),
-    valorCentavos: z.number(),
-    serviceId: z.number(),
+    ocorridaEm: z.any(),
+    categoria: z.string().nullable().optional(),
+    valorCentavos: z.coerce.number(),
+    serviceId: z.number().nullable().optional(),
   }),
 ]);
+
+const unifiedExpensesListSchema = z.object({
+  rows: z.array(unifiedExpenseSchema),
+  total: z.number(),
+  limit: z.number(),
+  offset: z.number(),
+});
 
 export function useListUnifiedExpenses(params?: { start?: string; end?: string; vehicleId?: number; driverId?: number; serviceId?: number; categoria?: string; tipo?: "vehicle"|"company"|"driver_payment"|"service"; statusPagamento?: "pending"|"paid"|"saldo"|"partial"|"overdue"|"canceled"|"pay_driver"; active?: boolean; limit?: number; offset?: number; sortOrder?: "asc"|"desc" }) {
   return useQuery({
@@ -548,7 +555,7 @@ export function useListUnifiedExpenses(params?: { start?: string; end?: string; 
         sortOrder: params?.sortOrder,
       }), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to list unified expenses");
-      return z.array(unifiedExpenseSchema).parse(await res.json());
+      return unifiedExpensesListSchema.parse(await res.json());
     },
   });
 }

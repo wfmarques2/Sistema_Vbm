@@ -1,17 +1,15 @@
 import { Layout } from "@/components/layout";
-import { useServices, useServicesPaged, useCreateService, useUpdateService, useDeleteService } from "@/hooks/use-services";
-import { useDrivers } from "@/hooks/use-drivers";
+import { useServicesPaged, useCreateService, useUpdateService, useDeleteService } from "@/hooks/use-services";
+import { useDrivers, useCreateDriver } from "@/hooks/use-drivers";
 import { useClients, useClientDependents, useCreateClient, useCreateClientDependent } from "@/hooks/use-clients";
-import { useVehicles } from "@/hooks/use-vehicles";
+import { useVehicles, useCreateVehicle } from "@/hooks/use-vehicles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -30,16 +28,17 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { es, ptBR } from "date-fns/locale";
-import { Plus, Search, Filter, Pencil, Trash2, CalendarIcon, ChevronDown, DollarSign, MoreHorizontal, Download } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, ChevronDown, DollarSign, MoreHorizontal, Download } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useEffect, useMemo, useState } from "react";
+import React from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertServiceSchema, serviceTypeEnum, paymentMethodEnum, serviceStatusEnum, paymentStatusEnum } from "@shared/schema";
+import { insertServiceSchema } from "@shared/schema";
 import * as XLSX from "xlsx";
 import { useToast } from "@/hooks/use-toast";
-import { useUpdateServiceExpenses, useCreateUnifiedExpense, buildUrl, useCreateDriverPayment } from "@/hooks/use-financial";
+import { useUpdateServiceExpenses, useCreateDriverPayment } from "@/hooks/use-financial";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -63,6 +62,8 @@ export default function ServicesPage() {
   const createMutation = useCreateService();
   const updateMutation = useUpdateService();
   const deleteMutation = useDeleteService();
+  const createDriverMutation = useCreateDriver();
+  const createVehicleMutation = useCreateVehicle();
   const [filterTravelStatus, setFilterTravelStatus] = useState<string>("all");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("all");
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>("all");
@@ -89,7 +90,6 @@ export default function ServicesPage() {
   const [isFinanceDialogOpen, setIsFinanceDialogOpen] = useState(false);
   const [financeServiceId, setFinanceServiceId] = useState<number | null>(null);
   const updateExpensesMutation = useUpdateServiceExpenses(financeServiceId || 0);
-  const createUnified = useCreateUnifiedExpense();
   const [financeDriverId, setFinanceDriverId] = useState<number | null>(null);
   const [stops, setStops] = useState<string[]>([]);
   const [dateTimeInput, setDateTimeInput] = useState<string>("");
@@ -539,18 +539,19 @@ export default function ServicesPage() {
               const header = (rows[0] || []).map((h) => String(h || "").trim().toLowerCase());
               const idx = (name: string) => {
                 const aliases = {
-                  hora: ["hora","time"],
-                  data: ["data","date"],
-                  mozio: ["id mozio","mozio","mozio id"],
-                  pax: ["pax","passageiros","qtd","quantidade"],
-                  model: ["modelo carro","modelo","car model"],
-                  origem: ["origem","origin"],
-                  destino: ["destino","destination"],
-                  voo: ["vôo","voo","flight"],
-                  status: ["status"],
-                  motorista: ["motorista","driver"],
-                  veiculo: ["veículo","veiculo","vehicle"],
-                } as Record<string,string[]>;
+                  hora: ["hora", "time"],
+                  data: ["data", "date"],
+                  data_group: ["data"],
+                  nome: ["nome", "passenger", "cliente"],
+                  telefone: ["telefone", "phone"],
+                  voo: ["vôo", "voo", "flight"],
+                  pax: ["pax", "passageiros", "qtd", "quantidade"],
+                  origem: ["origem", "origin"],
+                  destino: ["destino", "destination"],
+                  valor: ["valor", "value", "price"],
+                  motorista: ["motorista", "driver"],
+                  veiculo: ["veículo", "veiculo", "vehicle"],
+                } as Record<string, string[]>;
                 const list = aliases[name];
                 const i = header.findIndex((h) => list.includes(h));
                 return i >= 0 ? i : -1;
@@ -558,26 +559,20 @@ export default function ServicesPage() {
               const hIdx = {
                 hora: idx("hora"),
                 data: idx("data"),
-                mozio: idx("mozio"),
+                nome: idx("nome"),
+                telefone: idx("telefone"),
+                voo: idx("voo"),
                 pax: idx("pax"),
-                model: idx("model"),
                 origem: idx("origem"),
                 destino: idx("destino"),
-                voo: idx("voo"),
-                status: idx("status"),
+                valor: idx("valor"),
                 motorista: idx("motorista"),
                 veiculo: idx("veiculo"),
-                valor: idx("valor"),
-                metodo: idx("metodo"),
-                status_pagamento: idx("status_pagamento"),
-                cliente: idx("cliente"),
-                telefone: idx("telefone"),
               };
               const seen = new Set<string>();
               const body = rows.slice(1).filter(r => r && r.length > 0).map((r, i) => {
                 const get = (i: number) => (i >= 0 ? String(r[i] ?? "").trim() : "");
                 const parseTime = (s: string) => {
-                  // accepts 04:40PM or 04:40 PM or 16:40
                   const m = s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
                   if (m) {
                     let hh = Number(m[1]); const mm = Number(m[2]); const ap = m[3];
@@ -593,21 +588,19 @@ export default function ServicesPage() {
                 };
                 const dateStr = get(hIdx.data);
                 const timeStr = get(hIdx.hora);
-                const mozioId = get(hIdx.mozio);
                 const paxStr = get(hIdx.pax);
-                const carModel = get(hIdx.model);
                 const origin = get(hIdx.origem);
                 const destination = get(hIdx.destino);
                 const flight = get(hIdx.voo);
-                const status = get(hIdx.status).toLowerCase();
                 const driverName = get(hIdx.motorista);
                 const vehicleStr = get(hIdx.veiculo);
                 const valorStr = get(hIdx.valor);
-                const metodoStr = get(hIdx.metodo).toLowerCase();
-                const statusPagStr = get(hIdx.status_pagamento).toLowerCase();
-                const clienteStr = get(hIdx.cliente);
-                const telefoneStr = get(hIdx.telefone);
-                // Parse date dd/MM/yyyy or d/M/yyyy
+                const clienteStr = get(hIdx.nome);
+                let telefoneStr = get(hIdx.telefone);
+                if (telefoneStr && !telefoneStr.startsWith("+")) {
+                  telefoneStr = "+" + telefoneStr;
+                }
+
                 const parts = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
                 const t = parseTime(timeStr);
                 let dt = new Date();
@@ -616,73 +609,55 @@ export default function ServicesPage() {
                   dt = new Date(yyyy, MM, dd, t?.hh ?? 0, t?.mm ?? 0, 0, 0);
                 }
                 const passengers = Number(paxStr || "0") || 0;
-                const statusMap: Record<string, string> = {
-                  "agendado": "scheduled",
-                  "scheduled": "scheduled",
-                  "direção embarque": "driving_pickup",
-                  "direcao embarque": "driving_pickup",
-                  "driving pickup": "driving_pickup",
-                  "local embarque": "pickup_location",
-                  "pickup location": "pickup_location",
-                  "direção destino": "driving_destination",
-                  "direcao destino": "driving_destination",
-                  "driving destination": "driving_destination",
-                  "finalizado": "finished",
-                  "finished": "finished",
-                  "cancelado": "canceled",
-                  "canceled": "canceled",
-                  "em andamento": "driving_destination",
-                  "in progress": "driving_destination",
-                };
-                const st = statusMap[status] || "scheduled";
+                
+                // Conversão de Dólar para Real (usando taxa fixa de 5.0 como exemplo, já que não foi especificada)
+                // O usuário disse: "esse valor estará em dolar e deve ser convertido para Reais para ser salvo no sistema"
+                const valorNumUsd = parseFloat(valorStr.replace(",", ".")) || 0;
+                const conversionRate = 5.5; // Exemplo de taxa, pode ser ajustado
+                const valorNumBrl = valorNumUsd * conversionRate;
+
                 const driverId = drivers?.find(d => d.name.toLowerCase() === driverName.toLowerCase())?.id;
-                // Try match vehicle by plate at the end after '-' or by model
                 let vehicleId: number | undefined = undefined;
                 if (vehicleStr) {
                   const plate = vehicleStr.split("-").pop()?.trim().replace(/\s/g, "");
                   vehicleId = vehicles?.find(v => v.plate.replace(/\s/g, "").toUpperCase() === (plate||"").toUpperCase())?.id
                     ?? vehicles?.find(v => v.model.toLowerCase() === vehicleStr.toLowerCase())?.id;
                 }
+
                 const errors: string[] = [];
                 if (!parts) errors.push("Data inválida");
                 if (!origin) errors.push("Origem vazia");
                 if (!destination) errors.push("Destino vazio");
-                if (driverName && !driverId) errors.push("Motorista não encontrado");
-                if (vehicleStr && !vehicleId) errors.push("Veículo não encontrado");
-                const valorDigits = valorStr.replace(/\D/g, "");
-                const valorNum = valorDigits ? (parseInt(valorDigits, 10) / 100) : 0;
-                const methodMap: Record<string,string> = {
-                  "pix":"pix","dinheiro":"cash","cash":"cash","cartão crédito":"credit_card","cartao credito":"credit_card","credit_card":"credit_card","cartão débito":"debit_card","cartao debito":"debit_card","debit_card":"debit_card","saldo":"saldo","mozio":"mozio"
-                };
-                const pm = methodMap[metodoStr] || "pix";
-                const statusPayMap: Record<string,string> = {
-                  "pendente":"pending","pago":"paid","saldo":"saldo","parcial":"partial","atrasado":"overdue","cancelado":"canceled","pay_driver":"pay_driver","pending":"pending","paid":"paid","partial":"partial","overdue":"overdue","canceled":"canceled"
-                };
-                const sp = statusPayMap[statusPagStr] || "pending";
+                // Removendo erros de motorista/veículo não encontrado pois serão criados se necessário
+                
                 const clientName = clienteStr || "Importado XLSX";
                 const key = `${dt.toISOString()}|${origin}|${destination}|${clientName}`.toLowerCase();
                 if (seen.has(key)) errors.push("Duplicado no arquivo");
                 seen.add(key);
+
                 return {
                   payload: {
                     dateTime: dt,
                     origin,
                     destination,
-                    type: "airport",
+                    type: "airport", // Tipo "Privativo" por padrão (mapeado como airport ou outro?)
                     clientName,
                     clientPhone: telefoneStr || "-",
                     clientId: null,
                     driverId: driverId ?? null,
                     vehicleId: vehicleId ?? null,
-                    value: valorNum.toFixed(2),
-                    paymentMethod: pm,
-                    status: st,
-                    statusPagamento: sp,
+                    value: valorNumBrl.toFixed(2),
+                    paymentMethod: "mozio", // MOZIO por padrão
+                    status: "scheduled",
+                    statusPagamento: "pending", // pendente por padrão
                     notes: "",
                     passengers,
-                    carModel,
-                    mozioId,
+                    bags: passengers, // Malas = PAX
+                    paxAdt: passengers, // ADT = PAX
                     flight,
+                    guide: "", // Guia vazio por padrão
+                    driverNameDraft: driverName, // Para criação posterior
+                    vehicleModelDraft: vehicleStr, // Para criação posterior
                   },
                   errors,
                   index: i + 2
@@ -989,16 +964,15 @@ export default function ServicesPage() {
             ) : displayServices.length === 0 ? (
               <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">{t("services.empty")}</TableCell></TableRow>
             ) : (
-              displayServices.map((service, index) => {
+              displayServices.map((service) => {
                 const linkedReturns = returnServicesByParent.get(Number(service.id)) || [];
                 const hasLinkedReturn = !service.isReturn && linkedReturns.length > 0;
                 const parentId = Number(service.parentServiceId || 0);
                 const parentService = service.isReturn ? servicesById.get(parentId) : null;
                 const finance = getFinancialView(service);
                 return (
-                <>
+                <React.Fragment key={`main-${service.id}`}>
                 <TableRow 
-                  key={`main-${service.id}`} 
                   className={`group hover:bg-muted/30 transition-colors cursor-pointer ${service.isReturn ? "bg-amber-50/70 hover:bg-amber-100/80 dark:bg-[#3a2c1c]/45 dark:hover:bg-[#4a3720]/55" : ""} ${hasLinkedReturn ? "bg-cyan-50/50 dark:bg-[#1e2f39]/30" : ""}`}
                   onClick={() => handleEdit(service)}
                 >
@@ -1215,7 +1189,7 @@ export default function ServicesPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                </>
+                </React.Fragment>
               )})
             )}
           </TableBody>
@@ -1228,7 +1202,7 @@ export default function ServicesPage() {
             ) : displayServices.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">{t("services.empty")}</div>
           ) : (
-            displayServices.map((service, index) => {
+            displayServices.map((service) => {
               const linkedReturns = returnServicesByParent.get(Number(service.id)) || [];
               const hasLinkedReturn = !service.isReturn && linkedReturns.length > 0;
               const parentId = Number(service.parentServiceId || 0);
@@ -1452,9 +1426,69 @@ export default function ServicesPage() {
                 try {
                   let ok = 0; let fail = 0;
                   const validRows = importRows.filter((r: any) => (r.errors || []).length === 0);
+                  
+                  const createdDrivers = new Map<string, number>();
+                  const createdVehicles = new Map<string, number>();
+
                   for (const row of validRows) {
                     try {
-                      await createMutation.mutateAsync(row.payload);
+                      const payload = { ...row.payload };
+                      
+                      // Handle Driver creation/link
+                      if (payload.driverNameDraft && !payload.driverId) {
+                        const nameKey = payload.driverNameDraft.toLowerCase();
+                        if (createdDrivers.has(nameKey)) {
+                          payload.driverId = createdDrivers.get(nameKey);
+                        } else {
+                          const existing = drivers?.find(d => d.name.toLowerCase() === nameKey);
+                          if (existing) {
+                            payload.driverId = existing.id;
+                          } else {
+                            try {
+                              const newDriver = await createDriverMutation.mutateAsync({
+                                name: payload.driverNameDraft,
+                                phone: "-",
+                                type: "freelance",
+                                licenseValidity: new Date().toISOString().slice(0, 10),
+                              });
+                              payload.driverId = newDriver.id;
+                              createdDrivers.set(nameKey, newDriver.id);
+                            } catch (e) {
+                              console.error("Erro ao criar motorista na importação:", e);
+                            }
+                          }
+                        }
+                      }
+
+                      // Handle Vehicle creation/link
+                      if (payload.vehicleModelDraft && !payload.vehicleId) {
+                        const modelKey = payload.vehicleModelDraft.toLowerCase();
+                        if (createdVehicles.has(modelKey)) {
+                          payload.vehicleId = createdVehicles.get(modelKey);
+                        } else {
+                          const existing = vehicles?.find(v => v.model.toLowerCase() === modelKey);
+                          if (existing) {
+                            payload.vehicleId = existing.id;
+                          } else {
+                            try {
+                              const newVehicle = await createVehicleMutation.mutateAsync({
+                                model: payload.vehicleModelDraft,
+                                plate: "IMP-" + Math.random().toString(36).substring(7).toUpperCase(),
+                                capacity: payload.passengers || 4,
+                                luggageCapacity: payload.passengers || 4,
+                                type: "sedan",
+                                status: "available",
+                              });
+                              payload.vehicleId = newVehicle.id;
+                              createdVehicles.set(modelKey, newVehicle.id);
+                            } catch (e) {
+                              console.error("Erro ao criar veículo na importação:", e);
+                            }
+                          }
+                        }
+                      }
+
+                      await createMutation.mutateAsync(payload);
                       ok++;
                     } catch (e: any) {
                       fail++;

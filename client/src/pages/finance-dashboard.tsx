@@ -73,6 +73,8 @@ export default function FinanceDashboardPage() {
   const updateVehicle = useUpdateVehicleExpense();
   const updateDriverPay = useUpdateDriverPayment();
   const { toast } = useToast();
+  const driverPaymentsPendingRows = driverPaymentsPending?.rows || [];
+  const expensesRows = expensesList?.rows || [];
 
   function toDateKey(d: string | Date) {
     const dt = typeof d === "string" ? new Date(d) : d;
@@ -148,7 +150,7 @@ export default function FinanceDashboardPage() {
       days[key] = days[key] || { date: key, receita: 0, custos: 0, lucro: 0 };
       days[key].receita += Number(r.valorCentavos || 0);
     });
-    (expensesList || []).forEach((e: any) => {
+    expensesRows.forEach((e: any) => {
       const key = toDateKey(e.ocorridaEm);
       days[key] = days[key] || { date: key, receita: 0, custos: 0, lucro: 0 };
       days[key].custos += Number(e.valorCentavos || 0);
@@ -269,7 +271,7 @@ export default function FinanceDashboardPage() {
       { header: "Valor", key: "val", width: 14 },
     ];
     const payAgg: Record<string, Record<string, number>> = {};
-    (expensesList || []).forEach((e: any) => {
+    expensesRows.forEach((e: any) => {
       const tipo = e.tipo;
       const status = e.statusPagamento || "pending";
       payAgg[tipo] = payAgg[tipo] || {};
@@ -446,7 +448,7 @@ export default function FinanceDashboardPage() {
             />
             <MetricCard
               title="Pagamentos pendentes (Motoristas)"
-              value={`R$${(sumDriverPayments(driverPaymentsPending) / 100).toFixed(2)}`}
+              value={`R$${(sumDriverPayments(driverPaymentsPendingRows) / 100).toFixed(2)}`}
             />
             <MetricCard
               title="Serviços finalizados (mês)"
@@ -527,7 +529,7 @@ export default function FinanceDashboardPage() {
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-2">Despesas e pagamentos pendentes</div>
-                  {(expensesList || [])
+                  {expensesRows
                     .filter((e: any) => {
                       const st = e.statusPagamento || "pending";
                       return st !== "paid" && (e.tipo === "company" || e.tipo === "vehicle" || e.tipo === "driver_payment");

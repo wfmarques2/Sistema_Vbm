@@ -2057,15 +2057,22 @@ export async function registerRoutes(
           serviceId: s.id,
         })),
       ].sort((a, b) => {
-        const aDate = new Date(a.ocorridaEm as any).getTime();
-        const bDate = new Date(b.ocorridaEm as any).getTime();
-        return (input.sortOrder === "asc" ? 1 : -1) * (aDate - bDate);
+        const aDate = a.ocorridaEm ? new Date(a.ocorridaEm as any).getTime() : 0;
+        const bDate = b.ocorridaEm ? new Date(b.ocorridaEm as any).getTime() : 0;
+        const diff = (Number.isNaN(aDate) ? 0 : aDate) - (Number.isNaN(bDate) ? 0 : bDate);
+        return (input.sortOrder === "asc" ? 1 : -1) * diff;
       });
       const startIdx = input.offset ?? 0;
       const endIdx = (input.offset ?? 0) + (input.limit ?? 100);
-      return res.json(unified.slice(startIdx, endIdx));
+      return res.json({
+        rows: unified.slice(startIdx, endIdx),
+        total: unified.length,
+        limit: input.limit ?? 100,
+        offset: input.offset ?? 0,
+      });
     } catch (err) {
-      return res.status(500).json({ message: "Erro ao listar despesas unificadas" });
+      console.error("Erro em /api/financial/expenses:", err);
+      return res.status(500).json({ message: "Erro ao listar despesas unificadas", error: String(err) });
     }
   });
 

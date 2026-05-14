@@ -447,6 +447,19 @@ export default function ServiceVoucherPage() {
                     {" • Método: "}{paymentLabel(service.formaPagamento || service.paymentMethod)}
                   </div>
                 </div>
+                {service.showValueOnVoucher && (
+                  <div className="grid grid-cols-[110px_1fr]">
+                    <div className="px-2 py-1 border-r text-neutral-600 cell">VALOR DA VIAGEM</div>
+                    <div className="px-2 py-1 cell">
+                      {(() => {
+                        const valorCents = Number(service.valorCobrado || 0) > 0
+                          ? Number(service.valorCobrado || 0)
+                          : Math.round(Number(service.value || 0) * 100);
+                        return `R$ ${(valorCents / 100).toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                      })()}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="text-xs mt-1 flex items-center justify-between gap-4">
                 <span className="text-red-600">{t.phone} {service.clientPhone || "-"}</span>

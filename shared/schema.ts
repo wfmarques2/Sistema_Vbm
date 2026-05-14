@@ -169,6 +169,7 @@ export const services = pgTable("services", {
   returnDriverId: integer("return_driver_id").references(() => drivers.id),
   returnVehicleId: integer("return_vehicle_id").references(() => vehicles.id),
   guide: text("guide"),
+  showValueOnVoucher: boolean("show_value_on_voucher").default(false).notNull(),
 });
 
 export const userInvitations = pgTable("user_invitations", {
@@ -376,6 +377,7 @@ export const insertServiceSchema = createInsertSchema(services)
     paxInf: z.coerce.number().int().min(0).optional(),
     paxSen: z.coerce.number().int().min(0).optional(),
     paxFree: z.coerce.number().int().min(0).optional(),
+    showValueOnVoucher: z.coerce.boolean().optional(),
   });
 // Inserts dos novos schemas financeiros
 export const insertVehicleKmLogSchema = createInsertSchema(vehicleKmLogs).omit({ id: true, createdAt: true });
