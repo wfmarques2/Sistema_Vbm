@@ -484,8 +484,18 @@ export async function registerRoutes(
   });
 
   app.delete(api.vehicles.delete.path, async (req, res) => {
-    await storage.deleteVehicle(Number(req.params.id));
-    res.status(204).end();
+    try {
+      const vehicleId = Number(req.params.id);
+      // Desvincular veículos de serviços antes de excluir
+      await db.update(services).set({ vehicleId: null }).where(eq(services.vehicleId, vehicleId));
+      await db.update(services).set({ returnVehicleId: null }).where(eq(services.returnVehicleId, vehicleId));
+      
+      await storage.deleteVehicle(vehicleId);
+      res.status(204).end();
+    } catch (err) {
+      console.error("Erro ao excluir veículo:", err);
+      res.status(500).json({ message: "Erro ao excluir veículo devido a vínculos existentes." });
+    }
   });
 
   // --- Clients ---

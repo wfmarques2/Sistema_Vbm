@@ -494,6 +494,44 @@ export default function ServicesPage() {
     return `${parts.slice(0, -1).join(", ")} e ${parts[parts.length - 1]}`;
   };
 
+  const findDriverSmarter = (name: string) => {
+    if (!name) return null;
+    const search = name.toLowerCase().trim();
+    // 1. Exact match
+    const exact = drivers?.find(d => d.name.toLowerCase().trim() === search);
+    if (exact) return exact;
+    
+    // 2. Partial match: verifica se todas as partes do nome buscado existem no nome do motorista
+    // ou se todas as partes do nome do motorista existem na busca.
+    const searchParts = search.split(/\s+/).filter(p => p.length > 2); // ignora "de", "da", etc.
+    const partial = drivers?.find(d => {
+      const dName = d.name.toLowerCase().trim();
+      if (searchParts.length === 0) return dName === search;
+      return searchParts.every(p => dName.includes(p)) || dName.split(/\s+/).filter(p => p.length > 2).every(p => search.includes(p));
+    });
+    return partial || null;
+  };
+
+  const findVehicleSmarter = (model: string, plate: string) => {
+    if (!plate && !model) return null;
+    const plateSearch = plate?.replace(/\s/g, "").toUpperCase();
+    const modelSearch = model?.toLowerCase().trim();
+
+    // 1. Prioridade Total: Busca pela Placa (Identificador Único)
+    if (plateSearch) {
+      const byPlate = vehicles?.find(v => v.plate.replace(/\s/g, "").toUpperCase() === plateSearch);
+      if (byPlate) return byPlate;
+    }
+
+    // 2. Segunda Opção: Busca pelo Modelo exato
+    if (modelSearch) {
+      const byModel = vehicles?.find(v => v.model.toLowerCase().trim() === modelSearch);
+      if (byModel) return byModel;
+    }
+
+    return null;
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "scheduled": return <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-200">Agendado</Badge>;
@@ -536,12 +574,45 @@ export default function ServicesPage() {
               const wb = XLSX.read(buf);
               const sheet = wb.Sheets[wb.SheetNames[0]];
               const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
-              const header = (rows[0] || []).map((h) => String(h || "").trim().toLowerCase());
+              const headerRowIndex = rows.findIndex(r => r.includes("DATA") && r.includes("HORA"));
+              const header = (rows[headerRowIndex] || []).map((h) => String(h || "").trim().toLowerCase());
+              
+              const excelDateToJS = (serial: any) => {
+                if (typeof serial === "string" && serial.includes("/")) {
+                  const p = serial.split("/");
+                  return new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
+                }
+                const num = Number(serial);
+                if (isNaN(num)) return new Date();
+                return new Date(Math.round((num - 25569) * 86400 * 1000));
+              };
+
+              const parseTime = (s: any) => {
+                if (typeof s === "number") {
+                  const totalSeconds = Math.round(s * 86400);
+                  const hh = Math.floor(totalSeconds / 3600);
+                  const mm = Math.floor((totalSeconds % 3600) / 60);
+                  return { hh, mm };
+                }
+                const str = String(s || "");
+                const m = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+                if (m) {
+                  let hh = Number(m[1]); const mm = Number(m[2]); const ap = m[3];
+                  if (ap) {
+                    if (ap.toUpperCase() === "PM" && hh < 12) hh += 12;
+                    if (ap.toUpperCase() === "AM" && hh === 12) hh = 0;
+                  }
+                  return { hh, mm };
+                }
+                const m24 = str.match(/^(\d{1,2}):(\d{2})$/);
+                if (m24) return { hh: Number(m24[1]), mm: Number(m24[2]) };
+                return undefined;
+              };
+
               const idx = (name: string) => {
                 const aliases = {
                   hora: ["hora", "time"],
                   data: ["data", "date"],
-                  data_group: ["data"],
                   nome: ["nome", "passenger", "cliente"],
                   telefone: ["telefone", "phone"],
                   voo: ["vôo", "voo", "flight"],
@@ -550,9 +621,13 @@ export default function ServicesPage() {
                   destino: ["destino", "destination"],
                   valor: ["valor", "value", "price"],
                   motorista: ["motorista", "driver"],
-                  veiculo: ["veículo", "veiculo", "vehicle"],
+                  veiculo: ["carro", "veículo", "veiculo", "vehicle"],
                 } as Record<string, string[]>;
                 const list = aliases[name];
+                if (name === "veiculo") {
+                  const i = header.lastIndexOf("carro");
+                  if (i >= 0) return i;
+                }
                 const i = header.findIndex((h) => list.includes(h));
                 return i >= 0 ? i : -1;
               };
@@ -569,25 +644,32 @@ export default function ServicesPage() {
                 motorista: idx("motorista"),
                 veiculo: idx("veiculo"),
               };
+
+              // Buscar serviços existentes para verificação de duplicidade
+              const relevantRows = rows.slice(headerRowIndex + 1).filter(r => r && r.length > 0 && r[hIdx.data]);
+              const dates = relevantRows.map(r => excelDateToJS(r[hIdx.data]));
+              const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+              const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+              // Adiciona margem de 1 dia
+              minDate.setDate(minDate.getDate() - 1);
+              maxDate.setDate(maxDate.getDate() + 1);
+
+              let existingServices: any[] = [];
+              try {
+                const res = await fetch(`/api/services?start=${minDate.toISOString()}&end=${maxDate.toISOString()}`, { credentials: "include" });
+                if (res.ok) {
+                  existingServices = await res.json();
+                }
+              } catch (err) {
+                console.error("Erro ao buscar serviços existentes:", err);
+              }
+
               const seen = new Set<string>();
-              const body = rows.slice(1).filter(r => r && r.length > 0).map((r, i) => {
+              const body = relevantRows.map((r, i) => {
                 const get = (i: number) => (i >= 0 ? String(r[i] ?? "").trim() : "");
-                const parseTime = (s: string) => {
-                  const m = s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
-                  if (m) {
-                    let hh = Number(m[1]); const mm = Number(m[2]); const ap = m[3];
-                    if (ap) {
-                      if (ap.toUpperCase() === "PM" && hh < 12) hh += 12;
-                      if (ap.toUpperCase() === "AM" && hh === 12) hh = 0;
-                    }
-                    return { hh, mm };
-                  }
-                  const m24 = s.match(/^(\d{1,2}):(\d{2})$/);
-                  if (m24) return { hh: Number(m24[1]), mm: Number(m24[2]) };
-                  return undefined;
-                };
-                const dateStr = get(hIdx.data);
-                const timeStr = get(hIdx.hora);
+                
+                const dateVal = r[hIdx.data];
+                const timeVal = r[hIdx.hora];
                 const paxStr = get(hIdx.pax);
                 const origin = get(hIdx.origem);
                 const destination = get(hIdx.destino);
@@ -596,71 +678,99 @@ export default function ServicesPage() {
                 const vehicleStr = get(hIdx.veiculo);
                 const valorStr = get(hIdx.valor);
                 const clienteStr = get(hIdx.nome);
-                let telefoneStr = get(hIdx.telefone);
+                let telefoneStr = get(hIdx.telefone).replace(/\s/g, "");
                 if (telefoneStr && !telefoneStr.startsWith("+")) {
                   telefoneStr = "+" + telefoneStr;
                 }
 
-                const parts = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                const t = parseTime(timeStr);
-                let dt = new Date();
-                if (parts) {
-                  const dd = Number(parts[1]); const MM = Number(parts[2]) - 1; const yyyy = Number(parts[3]);
-                  dt = new Date(yyyy, MM, dd, t?.hh ?? 0, t?.mm ?? 0, 0, 0);
-                }
-                const passengers = Number(paxStr || "0") || 0;
+                const dtBase = excelDateToJS(dateVal);
+                const t = parseTime(timeVal);
+                const dt = new Date(dtBase.getFullYear(), dtBase.getMonth(), dtBase.getDate(), t?.hh ?? 0, t?.mm ?? 0);
                 
-                // Conversão de Dólar para Real (usando taxa fixa de 5.0 como exemplo, já que não foi especificada)
-                // O usuário disse: "esse valor estará em dolar e deve ser convertido para Reais para ser salvo no sistema"
-                const valorNumUsd = parseFloat(valorStr.replace(",", ".")) || 0;
-                const conversionRate = 5.5; // Exemplo de taxa, pode ser ajustado
+                const passengers = Number(paxStr || "0") || 0;
+                const valorNumUsd = parseFloat(String(valorStr).replace(",", ".")) || 0;
+                const conversionRate = 5.5; 
                 const valorNumBrl = valorNumUsd * conversionRate;
 
-                const driverId = drivers?.find(d => d.name.toLowerCase() === driverName.toLowerCase())?.id;
+                const matchedDriver = findDriverSmarter(driverName);
+                const driverId = matchedDriver?.id;
+
                 let vehicleId: number | undefined = undefined;
                 if (vehicleStr) {
-                  const plate = vehicleStr.split("-").pop()?.trim().replace(/\s/g, "");
-                  vehicleId = vehicles?.find(v => v.plate.replace(/\s/g, "").toUpperCase() === (plate||"").toUpperCase())?.id
-                    ?? vehicles?.find(v => v.model.toLowerCase() === vehicleStr.toLowerCase())?.id;
+                  let extractedModel = "Importado";
+                  let extractedPlate = "";
+                  
+                  if (vehicleStr.includes(" - ")) {
+                    const parts = vehicleStr.split(" - ");
+                    extractedModel = parts[0].trim();
+                    extractedPlate = parts.slice(1).join(" - ").trim();
+                  } else if (vehicleStr.includes("-")) {
+                    const parts = vehicleStr.split("-").map(p => p.trim());
+                    if (parts.length > 2) {
+                      extractedModel = parts[0];
+                      extractedPlate = parts.slice(1).join("-");
+                    } else {
+                      extractedModel = parts[0];
+                      extractedPlate = parts[1] || "";
+                    }
+                  } else {
+                    extractedModel = vehicleStr;
+                  }
+
+                  const matchedVehicle = findVehicleSmarter(extractedModel, extractedPlate);
+                  vehicleId = matchedVehicle?.id;
                 }
 
                 const errors: string[] = [];
-                if (!parts) errors.push("Data inválida");
+                if (!dateVal) errors.push("Data ausente");
                 if (!origin) errors.push("Origem vazia");
                 if (!destination) errors.push("Destino vazio");
-                // Removendo erros de motorista/veículo não encontrado pois serão criados se necessário
                 
                 const clientName = clienteStr || "Importado XLSX";
+                
+                // Verificação de duplicidade no arquivo
                 const key = `${dt.toISOString()}|${origin}|${destination}|${clientName}`.toLowerCase();
                 if (seen.has(key)) errors.push("Duplicado no arquivo");
                 seen.add(key);
+
+                // Verificação de duplicidade no banco de dados
+                const isDuplicateInDb = existingServices?.some((s: any) => {
+                  const sDt = new Date(s.dateTime);
+                  return (
+                    sDt.getTime() === dt.getTime() &&
+                    s.origin.toLowerCase().trim() === origin.toLowerCase().trim() &&
+                    s.destination.toLowerCase().trim() === destination.toLowerCase().trim() &&
+                    s.clientName.toLowerCase().trim() === clientName.toLowerCase().trim()
+                  );
+                });
+                if (isDuplicateInDb) errors.push("Já existe no sistema");
 
                 return {
                   payload: {
                     dateTime: dt,
                     origin,
                     destination,
-                    type: "airport", // Tipo "Privativo" por padrão (mapeado como airport ou outro?)
+                    type: "airport",
                     clientName,
                     clientPhone: telefoneStr || "-",
                     clientId: null,
                     driverId: driverId ?? null,
                     vehicleId: vehicleId ?? null,
                     value: valorNumBrl.toFixed(2),
-                    paymentMethod: "mozio", // MOZIO por padrão
+                    paymentMethod: "mozio",
                     status: "scheduled",
-                    statusPagamento: "pending", // pendente por padrão
+                    statusPagamento: "pending",
                     notes: "",
                     passengers,
-                    bags: passengers, // Malas = PAX
-                    paxAdt: passengers, // ADT = PAX
+                    bags: passengers,
+                    paxAdt: passengers,
                     flight,
-                    guide: "", // Guia vazio por padrão
-                    driverNameDraft: driverName, // Para criação posterior
-                    vehicleModelDraft: vehicleStr, // Para criação posterior
+                    guide: "",
+                    driverNameDraft: driverName,
+                    vehicleModelDraft: vehicleStr,
                   },
                   errors,
-                  index: i + 2
+                  index: i + headerRowIndex + 2
                 };
               });
               setImportRows(body);
@@ -1436,13 +1546,13 @@ export default function ServicesPage() {
                       
                       // Handle Driver creation/link
                       if (payload.driverNameDraft && !payload.driverId) {
-                        const nameKey = payload.driverNameDraft.toLowerCase();
+                        const nameKey = payload.driverNameDraft.toLowerCase().trim();
                         if (createdDrivers.has(nameKey)) {
                           payload.driverId = createdDrivers.get(nameKey);
                         } else {
-                          const existing = drivers?.find(d => d.name.toLowerCase() === nameKey);
-                          if (existing) {
-                            payload.driverId = existing.id;
+                          const matchedDriver = findDriverSmarter(payload.driverNameDraft);
+                          if (matchedDriver) {
+                            payload.driverId = matchedDriver.id;
                           } else {
                             try {
                               const newDriver = await createDriverMutation.mutateAsync({
@@ -1462,25 +1572,53 @@ export default function ServicesPage() {
 
                       // Handle Vehicle creation/link
                       if (payload.vehicleModelDraft && !payload.vehicleId) {
-                        const modelKey = payload.vehicleModelDraft.toLowerCase();
-                        if (createdVehicles.has(modelKey)) {
-                          payload.vehicleId = createdVehicles.get(modelKey);
+                        const rawVehicle = String(payload.vehicleModelDraft);
+                        // Tenta dividir pelo separador " - " (espaço hífen espaço) que separa Modelo da Placa
+                        let model = "Importado";
+                        let plate = "IMP-" + Math.random().toString(36).substring(7).toUpperCase();
+
+                        if (rawVehicle.includes(" - ")) {
+                          const mainParts = rawVehicle.split(" - ");
+                          model = mainParts[0].trim();
+                          plate = mainParts.slice(1).join(" - ").trim();
+                        } else if (rawVehicle.includes("-")) {
+                          // Caso não tenha espaços, mas tenha hífen (ex: VIRTUS-SXK-8E23)
+                          // Vamos assumir que o modelo é tudo antes do primeiro hífen se houver mais de um, 
+                          // ou simplesmente tratar com cautela.
+                          const parts = rawVehicle.split("-").map(p => p.trim());
+                          if (parts.length > 2) {
+                            // Se tem 3 partes (ex: VIRTUS, SXK, 8E23), modelo é a primeira e placa é o resto
+                            model = parts[0];
+                            plate = parts.slice(1).join("-");
+                          } else if (parts.length === 2) {
+                            model = parts[0];
+                            plate = parts[1];
+                          }
                         } else {
-                          const existing = vehicles?.find(v => v.model.toLowerCase() === modelKey);
-                          if (existing) {
-                            payload.vehicleId = existing.id;
+                          model = rawVehicle;
+                        }
+                        
+                        const modelKey = model.toLowerCase();
+                        const plateKey = plate.replace(/\s/g, "").toUpperCase();
+
+                        if (createdVehicles.has(plateKey)) {
+                          payload.vehicleId = createdVehicles.get(plateKey);
+                        } else {
+                          const matchedVehicle = findVehicleSmarter(model, plate);
+                          if (matchedVehicle) {
+                            payload.vehicleId = matchedVehicle.id;
                           } else {
                             try {
                               const newVehicle = await createVehicleMutation.mutateAsync({
-                                model: payload.vehicleModelDraft,
-                                plate: "IMP-" + Math.random().toString(36).substring(7).toUpperCase(),
+                                model: model,
+                                plate: plate,
                                 capacity: payload.passengers || 4,
                                 luggageCapacity: payload.passengers || 4,
                                 type: "sedan",
                                 status: "available",
                               });
                               payload.vehicleId = newVehicle.id;
-                              createdVehicles.set(modelKey, newVehicle.id);
+                              createdVehicles.set(plateKey, newVehicle.id);
                             } catch (e) {
                               console.error("Erro ao criar veículo na importação:", e);
                             }
