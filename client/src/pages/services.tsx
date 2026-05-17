@@ -578,10 +578,44 @@ export default function ServicesPage() {
               const header = (rows[headerRowIndex] || []).map((h) => String(h || "").trim().toLowerCase());
               
               const excelDateToJS = (serial: any) => {
-                if (typeof serial === "string" && serial.includes("/")) {
-                  const p = serial.split("/");
-                  return new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
+                if (!serial) return new Date();
+                if (serial instanceof Date) return serial;
+
+                if (typeof serial === "string") {
+                  const p = serial.split(/[\/\-]/);
+                  if (p.length === 3) {
+                    let day, month, year;
+                    if (p[0].length === 4) {
+                      // YYYY-MM-DD
+                      year = Number(p[0]);
+                      month = Number(p[1]) - 1;
+                      day = Number(p[2]);
+                    } else {
+                      const v0 = Number(p[0]);
+                      const v1 = Number(p[1]);
+                      const v2 = Number(p[2]);
+                      
+                      // Se o segundo componente for > 12, provavelmente é M/D/Y (formato americano)
+                      if (v1 > 12) {
+                        month = v0 - 1;
+                        day = v1;
+                        year = v2;
+                      } else {
+                        // Caso contrário, assume D/M/Y (formato brasileiro/padrão)
+                        day = v0;
+                        month = v1 - 1;
+                        year = v2;
+                      }
+                      if (year < 100) year += 2000;
+                    }
+                    const d = new Date(year, month, day);
+                    if (!isNaN(d.getTime())) return d;
+                  }
+                  
+                  const d = new Date(serial);
+                  if (!isNaN(d.getTime())) return d;
                 }
+
                 const num = Number(serial);
                 if (isNaN(num)) return new Date();
                 return new Date(Math.round((num - 25569) * 86400 * 1000));
@@ -615,7 +649,7 @@ export default function ServicesPage() {
                   data: ["data", "date"],
                   nome: ["nome", "passenger", "cliente"],
                   telefone: ["telefone", "phone"],
-                  voo: ["vôo", "voo", "flight"],
+                  voo: ["vôo", "voo", "flight", "vèo"],
                   pax: ["pax", "passageiros", "qtd", "quantidade"],
                   origem: ["origem", "origin"],
                   destino: ["destino", "destination"],
@@ -688,7 +722,32 @@ export default function ServicesPage() {
                 const dt = new Date(dtBase.getFullYear(), dtBase.getMonth(), dtBase.getDate(), t?.hh ?? 0, t?.mm ?? 0);
                 
                 const passengers = Number(paxStr || "0") || 0;
-                const valorNumUsd = parseFloat(String(valorStr).replace(",", ".")) || 0;
+                
+                // Limpa o valor de símbolos de moeda e garante o formato numérico correto
+                const cleanValor = (s: string) => {
+                  if (!s) return 0;
+                  // Remove tudo que não for número, vírgula ou ponto
+                  let cleaned = s.replace(/[^\d,\.]/g, "");
+                  
+                  // Se houver vírgula e ponto, assume que o último é o separador decimal
+                  const lastComma = cleaned.lastIndexOf(",");
+                  const lastDot = cleaned.lastIndexOf(".");
+                  
+                  if (lastComma > lastDot) {
+                    // Formato 1.234,56 -> 1234.56
+                    cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+                  } else if (lastDot > lastComma && lastComma !== -1) {
+                    // Formato 1,234.56 -> 1234.56
+                    cleaned = cleaned.replace(/,/g, "");
+                  } else if (lastComma !== -1) {
+                    // Apenas vírgula: 15,50 -> 15.50
+                    cleaned = cleaned.replace(",", ".");
+                  }
+                  
+                  return parseFloat(cleaned) || 0;
+                };
+
+                const valorNumUsd = cleanValor(String(valorStr));
                 const conversionRate = 5.5; 
                 const valorNumBrl = valorNumUsd * conversionRate;
 
