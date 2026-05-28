@@ -13,6 +13,7 @@ import ServicesPage from "@/pages/services";
 import ClientsPage from "@/pages/clients";
 import DriversPage from "@/pages/drivers";
 import VehiclesPage from "@/pages/vehicles";
+import VehicleExpensesPage from "@/pages/vehicle-expenses";
 import AgendaPage from "@/pages/agenda";
 import ReportsPage from "@/pages/reports";
 import FinanceServiceDetailPage from "@/pages/finance-service-detail";
@@ -86,6 +87,12 @@ function Router() {
       </Route>
       <Route path="/vehicles">
         <ProtectedRoute component={VehiclesPage} allow={["admin","operational"]} />
+      </Route>
+      <Route path="/vehicles/expenses">
+        <ProtectedRoute component={VehicleExpensesPage} allow={["admin","operational"]} />
+      </Route>
+      <Route path="/vehicles/expenses/:id">
+        <ProtectedRoute component={VehicleExpensesPage} allow={["admin","operational"]} />
       </Route>
       <Route path="/agenda">
         <ProtectedRoute component={AgendaPage} allow={["admin","operational","driver"]} />

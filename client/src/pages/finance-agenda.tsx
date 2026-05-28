@@ -175,9 +175,13 @@ export default function FinanceAgendaPage() {
                     <TableCell>{"categoria" in r ? r.categoria : "-"}</TableCell>
                     <TableCell>{"descricao" in r ? (r.descricao || "-") : "observacao" in r ? (r.observacao || "-") : "-"}</TableCell>
                     <TableCell>
-                      {"vehicleId" in r && (r as any).vehicleId ? `Veículo #${(r as any).vehicleId}` :
-                       "driverId" in r && (r as any).driverId ? `Motorista #${(r as any).driverId}` :
-                       "serviceId" in r && (r as any).serviceId ? `Serviço #${(r as any).serviceId}` : "Empresa"}
+                      {r.tipo === "vehicle" ? (
+                        r.vehicleModel ? `${r.vehicleModel} (${r.vehiclePlate})` : `Veículo #${r.vehicleId}`
+                      ) : r.tipo === "driver_payment" ? (
+                        r.driverName ? r.driverName : `Motorista #${r.driverId}`
+                      ) : r.tipo === "service" ? (
+                        r.vehicleModel ? `${r.vehicleModel} (${r.vehiclePlate})` : `Serviço #${r.serviceId}`
+                      ) : "Empresa"}
                     </TableCell>
                     <TableCell>{"statusPagamento" in r ? (r.statusPagamento || "-") : "-"}</TableCell>
                     <TableCell>{(r.valorCentavos / 100).toLocaleString(locale, { style: "currency", currency: "BRL" })}</TableCell>

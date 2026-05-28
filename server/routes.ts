@@ -6,7 +6,7 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { seedDatabase } from "./seed";
 import { db } from "./db";
-import { users, localAuth, userInvitations, profiles, insertUserInvitationSchema, adminCreateUserSchema, registerPasswordSchema, services, vehicleExpenses, companyExpenses, driverPayments, paymentMethodEnum, paymentStatusEnum, vehicleKmLogs, companyRevenues, clients, drivers, driverPushTokens } from "@shared/schema";
+import { users, localAuth, userInvitations, profiles, insertUserInvitationSchema, adminCreateUserSchema, registerPasswordSchema, services, vehicles, vehicleExpenses, companyExpenses, driverPayments, paymentMethodEnum, paymentStatusEnum, vehicleKmLogs, companyRevenues, clients, drivers, driverPushTokens } from "@shared/schema";
 import { eq, and, or, sql, gte, lt, asc, desc, inArray } from "drizzle-orm";
 import { pbkdf2Sync, randomBytes } from "crypto";
 import { financialService } from "./services/financial";
@@ -1334,6 +1334,7 @@ export async function registerRoutes(
         categoria: z.string().min(2),
         valorCentavos: z.number().int().nonnegative(),
         descricao: z.string().optional(),
+        odometer: z.number().int().optional(),
         ocorridaEm: z.coerce.date().optional(),
       });
       const input = schema.parse(req.body);
@@ -1414,6 +1415,7 @@ export async function registerRoutes(
         categoria: z.string().min(2).optional(),
         valorCentavos: z.number().int().nonnegative().optional(),
         descricao: z.string().optional(),
+        odometer: z.number().int().optional(),
         ocorridaEm: z.coerce.date().optional(),
         statusPagamento: z.enum(paymentStatusEnum).optional(),
         pagoEm: z.coerce.date().optional(),
@@ -1974,8 +1976,22 @@ export async function registerRoutes(
         vehConds.push(eq(vehicleExpenses.active, true));
       }
       const vehRows = input.tipo && input.tipo !== "vehicle" ? [] : await db
-        .select()
+        .select({
+          id: vehicleExpenses.id,
+          ocorridaEm: vehicleExpenses.ocorridaEm,
+          categoria: vehicleExpenses.categoria,
+          valorCentavos: vehicleExpenses.valorCentavos,
+          descricao: vehicleExpenses.descricao,
+          vehicleId: vehicleExpenses.vehicleId,
+          serviceId: vehicleExpenses.serviceId,
+          odometer: vehicleExpenses.odometer,
+          statusPagamento: vehicleExpenses.statusPagamento,
+          active: vehicleExpenses.active,
+          vehicleModel: vehicles.model,
+          vehiclePlate: vehicles.plate,
+        })
         .from(vehicleExpenses)
+        .leftJoin(vehicles, eq(vehicleExpenses.vehicleId, vehicles.id))
         .where(and(...vehConds));
       const compConds = [];
       if (input.start) compConds.push(gte(companyExpenses.ocorridaEm, input.start));
@@ -2008,8 +2024,21 @@ export async function registerRoutes(
       if (input.serviceId) payConds.push(eq(driverPayments.serviceId, input.serviceId));
       if (input.statusPagamento) payConds.push(eq(driverPayments.statusPagamento, input.statusPagamento));
       const payRows = input.tipo && input.tipo !== "driver_payment" ? [] : await db
-        .select()
+        .select({
+          id: driverPayments.id,
+          pagoEm: driverPayments.pagoEm,
+          periodoFim: driverPayments.periodoFim,
+          createdAt: driverPayments.createdAt,
+          valorCentavos: driverPayments.valorCentavos,
+          driverId: driverPayments.driverId,
+          serviceId: driverPayments.serviceId,
+          statusPagamento: driverPayments.statusPagamento,
+          metodoPagamento: driverPayments.metodoPagamento,
+          observacao: driverPayments.observacao,
+          driverName: drivers.name,
+        })
         .from(driverPayments)
+        .leftJoin(drivers, eq(driverPayments.driverId, drivers.id))
         .where(and(...(payConds.length ? payConds : [])));
       // Custos agregados por serviço
       const srvConds = [];
@@ -2019,8 +2048,20 @@ export async function registerRoutes(
       if (input.vehicleId) srvConds.push(eq(services.vehicleId, input.vehicleId));
       if (input.driverId) srvConds.push(eq(services.driverId, input.driverId));
       const srvRows = input.tipo && input.tipo !== "service" ? [] : await db
-        .select()
+        .select({
+          id: services.id,
+          dateTime: services.dateTime,
+          combustivel: services.combustivel,
+          pedagio: services.pedagio,
+          estacionamento: services.estacionamento,
+          alimentacao: services.alimentacao,
+          outrosCustos: services.outrosCustos,
+          serviceId: services.id,
+          vehicleModel: vehicles.model,
+          vehiclePlate: vehicles.plate,
+        })
         .from(services)
+        .leftJoin(vehicles, eq(services.vehicleId, vehicles.id))
         .where(and(...srvConds));
       // Normaliza estrutura
       const unified = [
@@ -2032,7 +2073,10 @@ export async function registerRoutes(
           valorCentavos: r.valorCentavos,
           descricao: r.descricao,
           vehicleId: r.vehicleId,
+          vehicleModel: r.vehicleModel,
+          vehiclePlate: r.vehiclePlate,
           serviceId: r.serviceId,
+          odometer: r.odometer,
           statusPagamento: r.statusPagamento,
           active: r.active,
         })),
@@ -2053,6 +2097,7 @@ export async function registerRoutes(
           ocorridaEm: r.pagoEm || r.periodoFim || r.createdAt,
           valorCentavos: r.valorCentavos,
           driverId: r.driverId,
+          driverName: r.driverName,
           serviceId: r.serviceId,
           statusPagamento: r.statusPagamento,
           metodoPagamento: r.metodoPagamento,
@@ -2065,6 +2110,8 @@ export async function registerRoutes(
           categoria: "custo_viagem",
           valorCentavos: Number(s.combustivel || 0) + Number(s.pedagio || 0) + Number(s.estacionamento || 0) + Number(s.alimentacao || 0) + Number(s.outrosCustos || 0),
           serviceId: s.id,
+          vehicleModel: s.vehicleModel,
+          vehiclePlate: s.vehiclePlate,
         })),
       ].sort((a, b) => {
         const aDate = a.ocorridaEm ? new Date(a.ocorridaEm as any).getTime() : 0;

@@ -131,13 +131,14 @@ export function useDeleteRevenue() {
 }
 const createVehicleExpenseSchema = z.object({
   vehicleId: z.number(),
-  serviceId: z.number().optional(),
+  serviceId: z.number().nullable().optional(),
   categoria: z.string(),
   valorCentavos: z.number(),
-  descricao: z.string().optional(),
-  ocorridaEm: z.string().optional(),
+  descricao: z.string().nullable().optional(),
+  odometer: z.number().nullable().optional(),
+  ocorridaEm: z.string().nullable().optional(),
   statusPagamento: z.enum(["pending","paid","saldo","partial","overdue","canceled","pay_driver"]).optional(),
-  pagoEm: z.string().optional(),
+  pagoEm: z.string().nullable().optional(),
   id: z.number(),
   active: z.boolean(),
   createdAt: z.string(),
@@ -157,6 +158,8 @@ export function useCreateVehicleExpense() {
       return createVehicleExpenseSchema.parse(await res.json());
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/financial/vehicle-expenses"] });
+      qc.invalidateQueries({ queryKey: ["/api/financial/expenses"] });
       qc.invalidateQueries({ queryKey: ["/api/financial/reports/period"] });
     },
   });
@@ -293,11 +296,12 @@ export function useDisableCompanyExpense() {
 
 const vehicleExpenseSchema = z.object({
   vehicleId: z.number(),
-  serviceId: z.number().optional(),
+  serviceId: z.number().nullable().optional(),
   categoria: z.string(),
   valorCentavos: z.number(),
-  descricao: z.string().optional(),
-  ocorridaEm: z.string().optional(),
+  descricao: z.string().nullable().optional(),
+  odometer: z.number().nullable().optional(),
+  ocorridaEm: z.string().nullable().optional(),
   statusPagamento: z.enum(["pending","paid","saldo","partial","overdue","canceled","pay_driver"]).optional(),
   pagoEm: z.string().nullable().optional(),
   id: z.number(),
@@ -493,7 +497,10 @@ const unifiedExpenseSchema = z.discriminatedUnion("tipo", [
     valorCentavos: z.coerce.number(),
     descricao: z.string().nullable().optional(),
     vehicleId: z.number().nullable().optional(),
+    vehicleModel: z.string().nullable().optional(),
+    vehiclePlate: z.string().nullable().optional(),
     serviceId: z.number().nullable().optional(),
+    odometer: z.number().nullable().optional(),
     statusPagamento: z.string().nullable().optional(),
     active: z.boolean().nullable().optional(),
   }),
@@ -514,6 +521,7 @@ const unifiedExpenseSchema = z.discriminatedUnion("tipo", [
     ocorridaEm: z.any(),
     valorCentavos: z.coerce.number(),
     driverId: z.number().nullable().optional(),
+    driverName: z.string().nullable().optional(),
     serviceId: z.number().nullable().optional(),
     statusPagamento: z.string().nullable().optional(),
     metodoPagamento: z.string().nullable().optional(),
@@ -526,6 +534,8 @@ const unifiedExpenseSchema = z.discriminatedUnion("tipo", [
     categoria: z.string().nullable().optional(),
     valorCentavos: z.coerce.number(),
     serviceId: z.number().nullable().optional(),
+    vehicleModel: z.string().nullable().optional(),
+    vehiclePlate: z.string().nullable().optional(),
   }),
 ]);
 

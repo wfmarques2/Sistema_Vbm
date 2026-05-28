@@ -410,12 +410,13 @@ function UnifiedRowWithDelete({ r, onDeleted }: { r: any; onDeleted: () => void 
         {"categoria" in r ? r.categoria : "observacao" in r ? (r.observacao || "-") : "-"}
       </TableCell>
       <TableCell>
-        {"vehicleId" in r && (r as any).vehicleId ? `Veículo #${(r as any).vehicleId}` :
-          "driverId" in r && (r as any).driverId ? `Motorista #${(r as any).driverId}` :
-          "serviceId" in r && (r as any).serviceId ? (() => {
-            const sid = String((r as any).serviceId);
-            return `Serviço #${sid.length > 4 ? "…" + sid.slice(-4) : sid}`;
-          })() : "-"}
+        {r.tipo === "vehicle" ? (
+          r.vehicleModel ? `${r.vehicleModel} (${r.vehiclePlate})` : `Veículo #${r.vehicleId}`
+        ) : r.tipo === "driver_payment" ? (
+          r.driverName ? r.driverName : `Motorista #${r.driverId}`
+        ) : r.tipo === "service" ? (
+          r.vehicleModel ? `${r.vehicleModel} (${r.vehiclePlate})` : `Serviço #${r.serviceId}`
+        ) : "-"}
       </TableCell>
       <TableCell>
         {r.tipo === "service" ? "-" : (

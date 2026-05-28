@@ -96,9 +96,20 @@ export const vehicles = pgTable("vehicles", {
   luggageCapacity: integer("luggage_capacity").default(0).notNull(),
   type: text("type", { enum: vehicleTypeEnum }).default("sedan").notNull(),
   status: text("status", { enum: vehicleStatusEnum }).default("available").notNull(),
+  autonomy: numeric("autonomy", { precision: 5, scale: 2 }), // km/l
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const insertVehicleSchema = createInsertSchema(vehicles)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    capacity: z.coerce.number().int().positive(),
+    luggageCapacity: z.coerce.number().int().min(0).default(0),
+    autonomy: z.coerce.number().min(0.1, "Autonomia deve ser maior que zero").optional().nullable(),
+  });
+export type Vehicle = typeof vehicles.$inferSelect;
+export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
 
 export const services = pgTable("services", {
   id: serial("id").primaryKey(),
@@ -216,6 +227,7 @@ export const vehicleExpenses = pgTable("vehicle_expenses", {
   categoria: text("categoria").notNull(),
   valorCentavos: integer("valor_centavos").notNull(),
   descricao: text("descricao"),
+  odometer: integer("odometer"),
   ocorridaEm: timestamp("ocorrida_em").defaultNow().notNull(),
   statusPagamento: text("status_pagamento", { enum: paymentStatusEnum }).default("pending"),
   pagoEm: timestamp("pago_em"),
@@ -349,12 +361,7 @@ export const insertClientSchema = createInsertSchema(clients).omit({ id: true, c
 export const insertClientDependentSchema = createInsertSchema(clientDependents).omit({ id: true, createdAt: true });
 export const insertDriverSchema = createInsertSchema(drivers).omit({ id: true, createdAt: true });
 export const insertDriverPushTokenSchema = createInsertSchema(driverPushTokens).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertVehicleSchema = createInsertSchema(vehicles)
-  .omit({ id: true, createdAt: true })
-  .extend({
-    capacity: z.coerce.number().int().positive(),
-    luggageCapacity: z.coerce.number().int().min(0).default(0),
-  });
+// Reusing already defined insertVehicleSchema
 export const insertServiceSchema = createInsertSchema(services)
   .omit({ id: true, createdAt: true })
   .extend({
@@ -406,8 +413,7 @@ export type InsertDriver = z.infer<typeof insertDriverSchema>;
 export type DriverPushToken = typeof driverPushTokens.$inferSelect;
 export type InsertDriverPushToken = z.infer<typeof insertDriverPushTokenSchema>;
 
-export type Vehicle = typeof vehicles.$inferSelect;
-export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
+// Vehicle type is already defined above
 
 export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;

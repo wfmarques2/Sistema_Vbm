@@ -396,13 +396,13 @@ export default function FinanceReportsPage() {
         data: new Date(r.ocorridaEm).toLocaleString(locale),
         descricao: "categoria" in r ? r.categoria : "observacao" in r ? r.observacao || "-" : "-",
         centro:
-          "vehicleId" in r && r.vehicleId
-            ? `Veículo #${r.vehicleId}`
-            : "driverId" in r && r.driverId
-            ? `Motorista #${r.driverId}`
-            : "serviceId" in r && r.serviceId
-            ? `Serviço #${r.serviceId}`
-            : "-",
+          r.tipo === "vehicle" ? (
+            r.vehicleModel ? `${r.vehicleModel} (${r.vehiclePlate})` : `Veículo #${r.vehicleId}`
+          ) : r.tipo === "driver_payment" ? (
+            r.driverName ? r.driverName : `Motorista #${r.driverId}`
+          ) : r.tipo === "service" ? (
+            r.vehicleModel ? `${r.vehicleModel} (${r.vehiclePlate})` : `Serviço #${r.serviceId}`
+          ) : "-",
         valor: Number(r.valorCentavos || 0) / 100,
       });
     });
