@@ -318,8 +318,15 @@ export async function registerRoutes(
         const body = req.body || {};
         const keys = Object.keys(body);
         const allowedStatuses = ["driving_pickup", "pickup_location", "driving_destination", "finished", "canceled"];
-        if (!(keys.length === 1 && keys[0] === "status" && allowedStatuses.includes(body.status))) {
+        const allowedKeys = ["status", "dateTime", "returnDateTime"];
+        const hasForbiddenKeys = keys.some(k => !allowedKeys.includes(k));
+
+        if (hasForbiddenKeys) {
           return res.status(403).json({ message: "Ação não permitida para Motorista" });
+        }
+
+        if (body.status && !allowedStatuses.includes(body.status)) {
+          return res.status(403).json({ message: "Status não permitido para Motorista" });
         }
       }
       next();

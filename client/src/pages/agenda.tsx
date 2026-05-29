@@ -550,35 +550,41 @@ export default function AgendaPage() {
                     <div><span className="font-semibold text-primary">Motorista:</span> {tripDriver}</div>
                     <div><span className="font-semibold text-primary">Data/Hora:</span> {format(new Date(tripDateTime), 'dd/MM/yyyy HH:mm', { locale: dateLocale })}</div>
                     <div><span className="font-semibold text-primary">Voo:</span> {tripFlight || "-"}</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2">
                       {flightSearchUrl ? (
-                        <Button type="button" variant="outline" asChild>
+                        <Button type="button" variant="outline" asChild className="w-full">
                           <a href={flightSearchUrl} target="_blank" rel="noreferrer">Consultar voo</a>
                         </Button>
                       ) : (
-                        <Button type="button" variant="outline" disabled>
+                        <Button type="button" variant="outline" disabled className="w-full">
                           Consultar voo
                         </Button>
                       )}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={updateMutation.isPending}
-                        onClick={() => adjustTripDateTime(serviceId, tripDateTime)}
-                      >
-                        Definir horário
-                      </Button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button type="button" variant="outline" disabled={updateMutation.isPending} onClick={() => adjustTripDateTime(serviceId, tripDateTime, 15)}>
-                        +15 min
-                      </Button>
-                      <Button type="button" variant="outline" disabled={updateMutation.isPending} onClick={() => adjustTripDateTime(serviceId, tripDateTime, 30)}>
-                        +30 min
-                      </Button>
-                      <Button type="button" variant="outline" disabled={updateMutation.isPending} onClick={() => adjustTripDateTime(serviceId, tripDateTime, 60)}>
-                        +60 min
-                      </Button>
+                    <div className="mt-2">
+                      <div className="text-xs font-semibold text-primary mb-1 uppercase tracking-wider">Ajustar hora de partida:</div>
+                      <div className="grid grid-cols-1 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          disabled={updateMutation.isPending}
+                          onClick={() => adjustTripDateTime(serviceId, tripDateTime)}
+                        >
+                          Definir horário manual
+                        </Button>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Button type="button" variant="outline" disabled={updateMutation.isPending} onClick={() => adjustTripDateTime(serviceId, tripDateTime, 15)}>
+                            +15 min
+                          </Button>
+                          <Button type="button" variant="outline" disabled={updateMutation.isPending} onClick={() => adjustTripDateTime(serviceId, tripDateTime, 30)}>
+                            +30 min
+                          </Button>
+                          <Button type="button" variant="outline" disabled={updateMutation.isPending} onClick={() => adjustTripDateTime(serviceId, tripDateTime, 60)}>
+                            +60 min
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div><span className="font-semibold text-primary">Qtde pax:</span> {paxTotal}</div>
