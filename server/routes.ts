@@ -959,6 +959,7 @@ export async function registerRoutes(
       paymentMethod?: string;
       limit?: number;
       offset?: number;
+      onlyDriverPayments?: boolean;
     } = {
       date: req.query.date as string,
       driverId: req.query.driverId ? Number(req.query.driverId) : undefined,
@@ -972,6 +973,7 @@ export async function registerRoutes(
       paymentMethod: req.query.paymentMethod as string,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
       offset: req.query.offset ? Number(req.query.offset) : undefined,
+      onlyDriverPayments: req.query.onlyDriverPayments === "true",
     };
     try {
       const cookies = parseCookies(req.headers.cookie);
@@ -1299,6 +1301,9 @@ export async function registerRoutes(
         estacionamento: z.number().int().nonnegative().optional(),
         alimentacao: z.number().int().nonnegative().optional(),
         outrosCustos: z.number().int().nonnegative().optional(),
+        driverPaymentDate: z.coerce.date().optional().nullable(),
+        driverPaymentCents: z.number().int().nonnegative().optional(),
+        driverPaymentStatus: z.enum(paymentStatusEnum).optional(),
         observacaoCustos: z.string().optional(),
       });
       const raw = schema.parse(req.body);
@@ -2063,12 +2068,18 @@ export async function registerRoutes(
           estacionamento: services.estacionamento,
           alimentacao: services.alimentacao,
           outrosCustos: services.outrosCustos,
+          driverPaymentDate: services.driverPaymentDate,
+          driverPaymentCents: services.driverPaymentCents,
+          driverPaymentStatus: services.driverPaymentStatus,
+          driverId: services.driverId,
           serviceId: services.id,
           vehicleModel: vehicles.model,
           vehiclePlate: vehicles.plate,
+          driver: drivers,
         })
         .from(services)
         .leftJoin(vehicles, eq(services.vehicleId, vehicles.id))
+        .leftJoin(drivers, eq(services.driverId, drivers.id))
         .where(and(...srvConds));
       // Normaliza estrutura
       const unified = [
@@ -2110,12 +2121,27 @@ export async function registerRoutes(
           metodoPagamento: r.metodoPagamento,
           observacao: r.observacao,
         })),
+        // Adiciona pagamentos de motorista vindos diretamente da tabela de serviços
+        ...srvRows.filter(s => Number(s.driverPaymentCents || 0) > 0).map((s) => ({
+          id: s.id,
+          tipo: "driver_payment" as const,
+          ocorridaEm: s.driverPaymentDate || s.dateTime,
+          valorCentavos: Number(s.driverPaymentCents),
+          driverId: s.driverId,
+          driverName: s.driver?.name || "Motorista",
+          serviceId: s.id,
+          statusPagamento: s.driverPaymentStatus || "pending",
+          isServiceBased: true, // flag para diferenciar
+        })),
         ...srvRows.map((s) => ({
           id: s.id,
           tipo: "service" as const,
           ocorridaEm: s.dateTime,
           categoria: "custo_viagem",
-          valorCentavos: Number(s.combustivel || 0) + Number(s.pedagio || 0) + Number(s.estacionamento || 0) + Number(s.alimentacao || 0) + Number(s.outrosCustos || 0),
+          // Subtrai o pagamento do motorista se ele for mostrado separadamente? 
+          // O usuário disse que "outrosCustos" já inclui o pagamento do motorista.
+          // Para não duplicar o custo no total do financeiro, subtraímos aqui se formos somar o driver_payment separado.
+          valorCentavos: (Number(s.combustivel || 0) + Number(s.pedagio || 0) + Number(s.estacionamento || 0) + Number(s.alimentacao || 0) + Number(s.outrosCustos || 0)) - Number(s.driverPaymentCents || 0),
           serviceId: s.id,
           vehicleModel: s.vehicleModel,
           vehiclePlate: s.vehiclePlate,

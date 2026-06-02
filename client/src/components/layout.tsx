@@ -30,6 +30,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const { language, setLanguage, t } = useI18n();
   const [financeOpen, setFinanceOpen] = useState(location.startsWith("/finance/"));
+  const [driversOpen, setDriversOpen] = useState(location.startsWith("/drivers"));
   const [servicesOpen, setServicesOpen] = useState(
     location === "/services" ||
     location === "/agenda" ||
@@ -40,8 +41,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navigation = [
     { name: t("layout.dashboard"), href: "/", icon: LayoutDashboard },
     { name: t("layout.clients"), href: "/clients", icon: Users },
-    { name: t("layout.drivers"), href: "/drivers", icon: Users },
     { name: t("layout.vehicles"), href: "/vehicles", icon: Car },
+  ];
+  const driversNavigation = [
+    { name: t("layout.list"), href: "/drivers", icon: Users },
+    { name: "Pagamentos", href: "/drivers/payments", icon: FileText },
   ];
   const servicesNavigation = [
     { name: t("layout.services"), href: "/services", icon: FileText },
@@ -106,6 +110,38 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+            {user?.role !== "driver" && (() => {
+              const driversActive = driversNavigation.some((i) => location === i.href);
+              return (
+                <div>
+                  <div
+                    className={`nav-item cursor-pointer ${driversActive ? "active" : ""}`}
+                    onClick={() => setDriversOpen((o) => !o)}
+                  >
+                    <Users className="w-5 h-5" />
+                    <span>{t("layout.drivers")}</span>
+                    <ChevronDown className={`w-4 h-4 ml-auto transition-transform ${driversOpen ? "rotate-180" : ""}`} />
+                  </div>
+                  {driversOpen && (
+                    <div className="mt-1 pl-8 space-y-1">
+                      {driversNavigation.map((item) => {
+                        const isActive = location === item.href;
+                        return (
+                          <Link key={item.name} href={item.href}>
+                            <div 
+                              className={`nav-item cursor-pointer ${isActive ? "active" : ""}`}
+                            >
+                              <item.icon className="w-4 h-4" />
+                              <span>{item.name}</span>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {(() => {
               const currentServicesNav = user?.role === "driver"
                 ? [

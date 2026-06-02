@@ -526,6 +526,7 @@ const unifiedExpenseSchema = z.discriminatedUnion("tipo", [
     statusPagamento: z.string().nullable().optional(),
     metodoPagamento: z.string().nullable().optional(),
     observacao: z.string().nullable().optional(),
+    isServiceBased: z.boolean().nullable().optional(),
   }),
   z.object({
     id: z.number(),
@@ -690,6 +691,9 @@ export function useUpdateServiceExpenses(serviceId: number) {
       estacionamento?: number;
       alimentacao?: number;
       outrosCustos?: number;
+      driverPaymentDate?: Date | string | null;
+      driverPaymentCents?: number;
+      driverPaymentStatus?: string;
       observacaoCustos?: string;
     }) => {
       const res = await fetch(`/api/services/${serviceId}/expenses`, {

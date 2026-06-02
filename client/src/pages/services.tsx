@@ -43,6 +43,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DateQuickFilters } from "@/components/date-quick-filters";
+import { Switch } from "@/components/ui/switch";
 import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
 
@@ -102,6 +103,8 @@ export default function ServicesPage() {
   const [alimDisplay, setAlimDisplay] = useState("R$ 0,00");
   const [outrosDisplay, setOutrosDisplay] = useState("R$ 0,00");
   const [driverPayDisplay, setDriverPayDisplay] = useState("R$ 0,00");
+  const [driverPaymentDate, setDriverPaymentDate] = useState<string>("");
+  const [driverPaymentStatus, setDriverPaymentStatus] = useState<string>("pending");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importRows, setImportRows] = useState<any[]>([]);
@@ -306,7 +309,9 @@ export default function ServicesPage() {
     setEstacDisplay(((service.estacionamento ?? 0) / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
     setAlimDisplay(((service.alimentacao ?? 0) / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
     setOutrosDisplay(((service.outrosCustos ?? 0) / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
-    setDriverPayDisplay("R$ 0,00");
+    setDriverPayDisplay(((service.driverPaymentCents ?? 0) / 100).toLocaleString(numberLocale, { style: "currency", currency: "BRL" }));
+    setDriverPaymentDate(service.driverPaymentDate ? toDateInput(new Date(service.driverPaymentDate)) : "");
+    setDriverPaymentStatus(service.driverPaymentStatus || "pending");
     setIsFinanceDialogOpen(true);
   };
 
@@ -861,6 +866,9 @@ export default function ServicesPage() {
                   estacionamento: toCentavos(estacDisplay),
                   alimentacao: toCentavos(alimDisplay),
                   outrosCustos: totalOutros,
+                  driverPaymentDate: driverPaymentDate || null,
+                  driverPaymentCents: driverPayCents,
+                  driverPaymentStatus: driverPaymentStatus,
                 });
                 qc.invalidateQueries({ queryKey: ["/api/services"] });
                 toast({ title: "Despesas salvas", description: `Custos atualizados para o serviço #${financeServiceId}.` });
@@ -974,6 +982,28 @@ export default function ServicesPage() {
                     }}
                   />
                   <div className="text-xs text-muted-foreground mt-1">Será somado em “Outros Custos”.</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Data do Pagamento</label>
+                  <Input
+                    type="date"
+                    value={driverPaymentDate}
+                    onChange={(e) => setDriverPaymentDate(e.target.value)}
+                  />
+                  <div className="text-xs text-muted-foreground mt-1">Data que aparecerá no financeiro.</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 py-2 px-1 bg-secondary/20 rounded-lg">
+                <label className="text-sm font-medium flex-1">Status do Pagamento ao Motorista</label>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-semibold ${driverPaymentStatus === "paid" ? "text-green-600" : "text-amber-600"}`}>
+                    {driverPaymentStatus === "paid" ? "PAGO" : "PENDENTE"}
+                  </span>
+                  <Switch
+                    checked={driverPaymentStatus === "paid"}
+                    onCheckedChange={(checked: boolean) => setDriverPaymentStatus(checked ? "paid" : "pending")}
+                  />
                 </div>
               </div>
 

@@ -26,9 +26,11 @@ import { useUpdateService } from "@/hooks/use-services";
 import { useUpdateCompanyExpense, useUpdateVehicleExpense, useUpdateDriverPayment } from "@/hooks/use-financial";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/lib/i18n";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function FinanceDashboardPage() {
   const { language, t } = useI18n();
+  const queryClient = useQueryClient();
   const locale = language === "es" ? "es-ES" : "pt-BR";
   const now = new Date();
   const [start, setStart] = useState<string>(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10));
@@ -551,15 +553,25 @@ export default function FinanceDashboardPage() {
                                 onError: (err) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
                               });
                             } else if (e.tipo === "vehicle") {
-                              updateVehicle.mutate({ id: e.id, statusPagamento: "paid", pagoEm: now as any }, {
+                              updateVehicle.mutate({ id: e.id, statusPagamento: "paid", pagoEm: now }, {
                                 onSuccess: () => toast({ title: "Atualizado", description: `Despesa de veículo #${e.id} marcada como paga.` }),
                                 onError: (err) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
                               });
                             } else if (e.tipo === "driver_payment") {
-                              updateDriverPay.mutate({ id: e.id, statusPagamento: "paid", pagoEm: now }, {
-                                onSuccess: () => toast({ title: "Atualizado", description: `Pagamento de motorista #${e.id} marcado como pago.` }),
-                                onError: (err) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
-                              });
+                              if (e.isServiceBased) {
+                                updateService.mutate({ id: e.id, driverPaymentStatus: "paid", driverPaymentDate: new Date() }, {
+                                  onSuccess: () => {
+                                    toast({ title: "Atualizado", description: `Pagamento do serviço #${e.id} marcado como pago.` });
+                                    queryClient.invalidateQueries({ queryKey: ["/api/financial/expenses"] });
+                                  },
+                                  onError: (err) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
+                                });
+                              } else {
+                                updateDriverPay.mutate({ id: e.id, statusPagamento: "paid", pagoEm: now }, {
+                                  onSuccess: () => toast({ title: "Atualizado", description: `Pagamento de motorista #${e.id} marcado como pago.` }),
+                                  onError: (err) => toast({ title: "Erro", description: err.message, variant: "destructive" }),
+                                });
+                              }
                             }
                           }}
                           disabled={updateCompany.isPending || updateVehicle.isPending || updateDriverPay.isPending}

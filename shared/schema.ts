@@ -72,6 +72,7 @@ export const drivers = pgTable("drivers", {
   email: text("email"),
   type: text("type", { enum: driverTypeEnum }).notNull(),
   licenseValidity: date("license_validity").notNull(), // CNH validity
+  pixKey: text("pix_key"),
   notes: text("notes"),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -171,6 +172,9 @@ export const services = pgTable("services", {
   alimentacao: integer("alimentacao").default(0).notNull(),
   outrosCustos: integer("outros_custos").default(0).notNull(),
   observacaoCustos: text("observacao_custos"),
+  driverPaymentDate: timestamp("driver_payment_date"),
+  driverPaymentCents: integer("driver_payment_cents").default(0).notNull(),
+  driverPaymentStatus: text("driver_payment_status", { enum: paymentStatusEnum }).default("pending").notNull(),
   // Dados adicionais de voucher
   hasReturn: boolean("has_return").default(false).notNull(),
   returnDateTime: timestamp("return_date_time"),
@@ -375,6 +379,9 @@ export const insertServiceSchema = createInsertSchema(services)
     returnFlight: z.string().optional(),
     returnDriverId: z.coerce.number().int().optional(),
     returnVehicleId: z.coerce.number().int().optional(),
+    driverPaymentDate: z.coerce.date().optional().nullable(),
+    driverPaymentCents: z.coerce.number().int().min(0).optional(),
+    driverPaymentStatus: z.enum(paymentStatusEnum).optional(),
     guide: z.string().optional(),
     passengers: z.coerce.number().int().min(0).optional(),
     bags: z.coerce.number().int().min(0).optional(),

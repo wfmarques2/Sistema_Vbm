@@ -16,6 +16,8 @@ type TranslationKey =
   | "layout.dashboard"
   | "layout.clients"
   | "layout.drivers"
+  | "layout.list"
+  | "layout.payments"
   | "layout.vehicles"
   | "layout.services"
   | "layout.agenda"
@@ -180,13 +182,15 @@ const ptBR: TranslationMap = {
   "common.edit": "Editar",
   "common.delete": "Excluir",
   "common.back": "Voltar",
-  "layout.adminPanel": "Painel Administrativo",
-  "layout.dashboard": "Painel",
-  "layout.clients": "Clientes",
-  "layout.drivers": "Motoristas",
-  "layout.vehicles": "Veículos",
-  "layout.services": "Serviços",
-  "layout.agenda": "Agenda",
+    "layout.adminPanel": "Painel Administrativo",
+    "layout.dashboard": "Dashboard",
+    "layout.clients": "Clientes",
+    "layout.drivers": "Motoristas",
+    "layout.list": "Listagem",
+    "layout.payments": "Pagamentos",
+    "layout.vehicles": "Veículos",
+    "layout.services": "Serviços",
+    "layout.agenda": "Agenda",
   "layout.reports": "Relatórios",
   "layout.history": "Histórico",
   "layout.finance": "Financeiro",
@@ -351,6 +355,8 @@ const es: TranslationMap = {
   "layout.dashboard": "Panel",
   "layout.clients": "Clientes",
   "layout.drivers": "Conductores",
+  "layout.list": "Listado",
+  "layout.payments": "Pagos",
   "layout.vehicles": "Vehiculos",
   "layout.services": "Servicios",
   "layout.agenda": "Agenda",

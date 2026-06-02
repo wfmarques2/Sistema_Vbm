@@ -49,7 +49,19 @@ export interface IStorage {
   deleteVehicle(id: number): Promise<void>;
 
   // Services
-  getServices(filters?: { date?: string, driverId?: number, status?: string, start?: string, end?: string }): Promise<ServiceWithDetails[]>;
+  getServices(filters?: { 
+    date?: string, 
+    driverId?: number, 
+    vehicleId?: number,
+    status?: string, 
+    start?: string, 
+    end?: string,
+    statusPagamento?: string,
+    paymentMethod?: string,
+    limit?: number,
+    offset?: number,
+    onlyDriverPayments?: boolean
+  }): Promise<ServiceWithDetails[]>;
   getService(id: number): Promise<ServiceWithDetails | undefined>;
   createService(service: InsertService): Promise<Service>;
   updateService(id: number, service: Partial<InsertService>): Promise<Service>;
@@ -252,6 +264,9 @@ export class DatabaseStorage implements IStorage {
       valorCobrado: services.valorCobrado,
       formaPagamento: services.formaPagamento,
       statusPagamento: services.statusPagamento,
+      driverPaymentDate: services.driverPaymentDate,
+      driverPaymentCents: services.driverPaymentCents,
+      driverPaymentStatus: services.driverPaymentStatus,
       hasReturn: services.hasReturn,
       returnDateTime: services.returnDateTime,
       returnOrigin: services.returnOrigin,
@@ -318,6 +333,9 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.start && filters?.end) {
         conditions.push(and(gte(services.dateTime, new Date(filters.start)), lt(services.dateTime, new Date(filters.end))));
+    }
+    if (filters?.onlyDriverPayments) {
+      conditions.push(sql`${services.driverPaymentCents} > 0`);
     }
 
     if (conditions.length > 0) {

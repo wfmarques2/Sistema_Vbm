@@ -55,6 +55,7 @@ export default function DriversPage() {
       email: "",
       type: "fixed",
       licenseValidity: new Date().toISOString().split('T')[0],
+      pixKey: "",
       notes: "",
       active: true,
     }
@@ -86,6 +87,7 @@ export default function DriversPage() {
     form.reset({
       ...driver,
       email: driver.email || "",
+      pixKey: driver.pixKey || "",
       licenseValidity: driver.licenseValidity ? new Date(driver.licenseValidity).toISOString().split('T')[0] : "",
     });
     setIsDialogOpen(true);
@@ -186,6 +188,17 @@ export default function DriversPage() {
                     )}
                   />
                 </div>
+                <FormField
+                  control={form.control}
+                  name="pixKey"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Chave PIX</FormLabel>
+                      <FormControl><Input placeholder="CPF, E-mail, Telefone ou Chave Aleatória" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
                   {editingId ? t("drivers.update") : t("drivers.create")}
                 </Button>
@@ -203,6 +216,7 @@ export default function DriversPage() {
               <TableHead>Contato</TableHead>
               <TableHead>E-mail</TableHead>
               <TableHead>Vínculo</TableHead>
+              <TableHead>Chave PIX</TableHead>
               <TableHead>Validade CNH</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">{t("common.actions")}</TableHead>
@@ -210,9 +224,9 @@ export default function DriversPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-               <TableRow><TableCell colSpan={7} className="text-center py-8">{t("drivers.loading")}</TableCell></TableRow>
+               <TableRow><TableCell colSpan={8} className="text-center py-8">{t("drivers.loading")}</TableCell></TableRow>
             ) : drivers?.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">{t("drivers.empty")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t("drivers.empty")}</TableCell></TableRow>
             ) : (
               drivers?.map((driver) => (
                 <TableRow key={driver.id} className="group hover:bg-muted/30 transition-colors">
@@ -227,6 +241,7 @@ export default function DriversPage() {
                   <TableCell className="capitalize">
                     {driver.type === "fixed" ? "Fixo" : driver.type === "freelance" ? "Autônomo" : "—"}
                   </TableCell>
+                  <TableCell className="text-sm font-mono">{driver.pixKey || "—"}</TableCell>
                   <TableCell>
                     <div className="flex items-center text-sm">
                       <Calendar className="w-3 h-3 mr-1" />
