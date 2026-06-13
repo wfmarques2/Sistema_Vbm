@@ -497,7 +497,10 @@ export default function ServiceEditPage() {
           await deleteMutation.mutateAsync(returnServiceId);
         }
       }
-      navigate("/services");
+      // Preserve query params when going back to services
+      const params = new URLSearchParams(window.location.search);
+      const queryString = params.toString();
+      navigate("/services" + (queryString ? `?${queryString}` : ""));
     } catch (err: any) {
       toast({
         title: "Erro",
@@ -562,7 +565,15 @@ export default function ServiceEditPage() {
     <Layout>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-display font-bold text-primary">{isEdit ? t("services.editTitle") : t("services.newTitle")}</h2>
-        <Button variant="outline" onClick={() => navigate("/services")}>{t("common.back")}</Button>
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            // Preserve query params when going back to services
+            const params = new URLSearchParams(window.location.search);
+            const queryString = params.toString();
+            navigate("/services" + (queryString ? `?${queryString}` : ""));
+          }}
+        >{t("common.back")}</Button>
       </div>
       <div className="max-w-4xl">
         <Form {...form}>

@@ -323,16 +323,21 @@ export class DatabaseStorage implements IStorage {
       conditions.push(or(eq(services.formaPagamento, filters.paymentMethod as any), eq(services.paymentMethod, filters.paymentMethod as any)));
     }
     if (filters?.date) {
-      // Simple date equality check (assuming date string YYYY-MM-DD)
-      // This is a bit tricky with timestamps, usually better to do range for the whole day
-      const startOfDay = new Date(filters.date);
-      startOfDay.setHours(0,0,0,0);
-      const endOfDay = new Date(filters.date);
-      endOfDay.setHours(23,59,59,999);
+      // Parse YYYY-MM-DD string safely as local date
+      const [year, month, day] = filters.date.split("-").map(Number);
+      const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0);
+      const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
       conditions.push(and(gte(services.dateTime, startOfDay), lt(services.dateTime, endOfDay)));
     }
     if (filters?.start && filters?.end) {
-        conditions.push(and(gte(services.dateTime, new Date(filters.start)), lt(services.dateTime, new Date(filters.end))));
+        // Parse YYYY-MM-DD string safely as local date at midnight
+        const [yearS, monthS, dayS] = filters.start.split("-").map(Number);
+        const startDate = new Date(yearS, monthS - 1, dayS, 0, 0, 0, 0);
+        
+        const [yearE, monthE, dayE] = filters.end.split("-").map(Number);
+        const endDate = new Date(yearE, monthE - 1, dayE, 0, 0, 0, 0);
+        
+        conditions.push(and(gte(services.dateTime, startDate), lt(services.dateTime, endDate)));
     }
     if (filters?.onlyDriverPayments) {
       conditions.push(sql`${services.driverPaymentCents} > 0`);

@@ -26,9 +26,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { format } from "date-fns";
+import { format, addDays, startOfDay, endOfDay } from "date-fns";
 import { es, ptBR } from "date-fns/locale";
-import { Plus, Search, Filter, Pencil, Trash2, ChevronDown, DollarSign, MoreHorizontal, Download } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, ChevronDown, DollarSign, MoreHorizontal, Download, Calendar as CalendarIcon } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import React from "react";
@@ -44,6 +44,8 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DateQuickFilters } from "@/components/date-quick-filters";
 import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n";
 
@@ -193,15 +195,80 @@ export default function ServicesPage() {
   const [newPassengerPhone, setNewPassengerPhone] = useState("");
   const [extraPassengers, setExtraPassengers] = useState<string[]>([]);
 
-  if (!initializedFromQuery) {
+  // Initialize from URL query params on first render
+  useEffect(() => {
+    if (initializedFromQuery) return;
+    
     const params = new URLSearchParams(window.location.search);
     if (params.get("new")) {
       setEditingId(null);
       form.reset();
       setIsDialogOpen(true);
     }
+    // Read filter params
+    if (params.get("search")) setSearch(params.get("search")!);
+    if (params.get("start")) setStart(params.get("start")!);
+    if (params.get("end")) setEnd(params.get("end")!);
+    if (params.get("month")) setFilterMonth(params.get("month")!);
+    if (params.get("status")) setFilterTravelStatus(params.get("status")!);
+    if (params.get("paymentStatus")) setFilterPaymentStatus(params.get("paymentStatus")!);
+    if (params.get("paymentMethod")) setFilterPaymentMethod(params.get("paymentMethod")!);
+    if (params.get("driverId")) setFilterDriverId(Number(params.get("driverId")!));
+    if (params.get("vehicleId")) setFilterVehicleId(Number(params.get("vehicleId")!));
+    if (params.get("showFilters")) setShowFilters(true);
+    if (params.get("page")) setPage(Number(params.get("page")!));
+    
     setInitializedFromQuery(true);
-  }
+  }, [initializedFromQuery, form]);
+
+  // Sync filter state to URL search params
+  useEffect(() => {
+    if (!initializedFromQuery) return; // Wait until initialized
+
+    // Parse query params from current location string
+    const queryIndex = location.indexOf("?");
+    const queryString = queryIndex >= 0 ? location.substring(queryIndex + 1) : "";
+    const params = new URLSearchParams(queryString);
+    
+    // Update or remove params
+    if (search) params.set("search", search); else params.delete("search");
+    if (start) params.set("start", start); else params.delete("start");
+    if (end) params.set("end", end); else params.delete("end");
+    if (filterMonth !== "all") params.set("month", filterMonth); else params.delete("month");
+    if (filterTravelStatus !== "all") params.set("status", filterTravelStatus); else params.delete("status");
+    if (filterPaymentStatus !== "all") params.set("paymentStatus", filterPaymentStatus); else params.delete("paymentStatus");
+    if (filterPaymentMethod !== "all") params.set("paymentMethod", filterPaymentMethod); else params.delete("paymentMethod");
+    if (typeof filterDriverId === "number") params.set("driverId", String(filterDriverId)); else params.delete("driverId");
+    if (typeof filterVehicleId === "number") params.set("vehicleId", String(filterVehicleId)); else params.delete("vehicleId");
+    if (showFilters) params.set("showFilters", "true"); else params.delete("showFilters");
+    if (page > 0) params.set("page", String(page)); else params.delete("page");
+    
+    // Build new location with updated params
+    const newQuery = params.toString();
+    const newLocation = "/services" + (newQuery ? `?${newQuery}` : "");
+    
+    // Check if the new location is different from current
+    const currentQuery = location.split("?")[1] || "";
+    const hasChanged = (newQuery !== currentQuery);
+    
+    if (hasChanged) {
+      setLocation(newLocation, { replace: true });
+    }
+  }, [
+    initializedFromQuery, 
+    search, 
+    start, 
+    end, 
+    filterMonth, 
+    filterTravelStatus, 
+    filterPaymentStatus, 
+    filterPaymentMethod, 
+    filterDriverId, 
+    filterVehicleId, 
+    showFilters, 
+    page,
+    setLocation
+  ]);
 
   const onSubmit = async (values: any) => {
     // Ensure numeric fields are numbers for the API
@@ -338,7 +405,11 @@ export default function ServicesPage() {
       openFinanceDialog(service);
       return;
     }
-    setLocation(`/services/${service.id}/edit`);
+    // Preserve the existing query params
+    const currentParams = new URLSearchParams(window.location.search);
+    const queryString = currentParams.toString();
+    const newLocation = `/services/${service.id}/edit` + (queryString ? `?${queryString}` : "");
+    setLocation(newLocation);
   };
 
   const handleDelete = async (id: number) => {
@@ -1058,6 +1129,60 @@ export default function ServicesPage() {
                 </SelectContent>
               </Select>
             </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <CalendarIcon className="w-4 h-4" />
+                  Escolher Data
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="center">
+                <Calendar
+                  mode="single"
+                  selected={start ? new Date(start + "T00:00:00") : undefined}
+                  onSelect={(date) => {
+                    if (date) {
+                      // Use the existing toDateInput function to get YYYY-MM-DD local date
+                      const selectedDate = toDateInput(date);
+                      setStart(selectedDate);
+                      
+                      // Calculate next day using date-fns addDays to avoid timezone issues
+                      const nextDate = addDays(date, 1);
+                      setEnd(toDateInput(nextDate));
+                      
+                      setFilterMonth("all");
+                      setPage(0);
+                    }
+                  }}
+                  locale={language === "es" ? es : ptBR}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            {(start || end) && (
+              <Button 
+                variant="ghost" 
+                className="gap-2"
+                onClick={() => {
+                  // Navigate to clean /services page
+                  setLocation("/services");
+                  // Also reset the state to make sure everything is clear
+                  setStart("");
+                  setEnd("");
+                  setFilterMonth("all");
+                  setPage(0);
+                  setSearch("");
+                  setFilterTravelStatus("all");
+                  setFilterPaymentStatus("all");
+                  setFilterPaymentMethod("all");
+                  setFilterDriverId("");
+                  setFilterVehicleId("");
+                  setShowFilters(false);
+                }}
+              >
+                Limpar
+              </Button>
+            )}
             <Button variant="outline" className="gap-2" onClick={() => setShowFilters((v) => !v)}>
               <Filter className="w-4 h-4" />
               {showFilters ? "Ocultar filtros" : "Filtros"}
