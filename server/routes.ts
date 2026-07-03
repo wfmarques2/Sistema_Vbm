@@ -447,8 +447,24 @@ export async function registerRoutes(
   });
 
   app.delete(api.drivers.delete.path, async (req, res) => {
-    await storage.deleteDriver(Number(req.params.id));
-    res.status(204).end();
+    try {
+      const driverId = Number(req.params.id);
+      // Desvincular motoristas de serviços
+      await db.update(services).set({ driverId: null }).where(eq(services.driverId, driverId));
+      await db.update(services).set({ returnDriverId: null }).where(eq(services.returnDriverId, driverId));
+      
+      // Excluir registros relacionados
+      await db.delete(driverPayments).where(eq(driverPayments.driverId, driverId));
+      await db.delete(driverPushTokens).where(eq(driverPushTokens.driverId, driverId));
+      await db.update(vehicleKmLogs).set({ driverId: null }).where(eq(vehicleKmLogs.driverId, driverId));
+      await db.update(profiles).set({ driverId: null }).where(eq(profiles.driverId, driverId));
+      
+      await storage.deleteDriver(driverId);
+      res.status(204).end();
+    } catch (err) {
+      console.error("Erro ao excluir motorista:", err);
+      res.status(500).json({ message: "Erro ao excluir motorista devido a vínculos existentes." });
+    }
   });
 
   // --- Vehicles ---
@@ -496,6 +512,10 @@ export async function registerRoutes(
       // Desvincular veículos de serviços antes de excluir
       await db.update(services).set({ vehicleId: null }).where(eq(services.vehicleId, vehicleId));
       await db.update(services).set({ returnVehicleId: null }).where(eq(services.returnVehicleId, vehicleId));
+      
+      // Excluir ou desvincular registros relacionados
+      await db.delete(vehicleExpenses).where(eq(vehicleExpenses.vehicleId, vehicleId));
+      await db.delete(vehicleKmLogs).where(eq(vehicleKmLogs.vehicleId, vehicleId));
       
       await storage.deleteVehicle(vehicleId);
       res.status(204).end();
@@ -918,8 +938,21 @@ export async function registerRoutes(
     }
   });
   app.delete(api.clients.delete.path, async (req, res) => {
-    await storage.deleteClient(Number(req.params.id));
-    res.status(204).end();
+    try {
+      const clientId = Number(req.params.id);
+      // Desvincular clientes de serviços (ou manter histórico)
+      await db.update(services).set({ clientId: null }).where(eq(services.clientId, clientId));
+      
+      // Excluir registros relacionados
+      await db.delete(clientDependents).where(eq(clientDependents.clientId, clientId));
+      await db.update(companyRevenues).set({ clientId: null }).where(eq(companyRevenues.clientId, clientId));
+      
+      await storage.deleteClient(clientId);
+      res.status(204).end();
+    } catch (err) {
+      console.error("Erro ao excluir cliente:", err);
+      res.status(500).json({ message: "Erro ao excluir cliente devido a vínculos existentes." });
+    }
   });
 
   // --- Client Dependents ---
