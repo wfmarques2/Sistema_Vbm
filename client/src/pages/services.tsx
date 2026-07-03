@@ -649,7 +649,7 @@ export default function ServicesPage() {
               const buf = await f.arrayBuffer();
               const wb = XLSX.read(buf);
               const sheet = wb.Sheets[wb.SheetNames[0]];
-              const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+              const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
               const headerRowIndex = rows.findIndex(r => r.includes("DATA") && r.includes("HORA"));
               const header = (rows[headerRowIndex] || []).map((h) => String(h || "").trim().toLowerCase());
               
@@ -671,13 +671,19 @@ export default function ServicesPage() {
                       const v1 = Number(p[1]);
                       const v2 = Number(p[2]);
                       
-                      // Se o segundo componente for > 12, provavelmente é M/D/Y (formato americano)
-                      if (v1 > 12) {
+                      // Formato brasileiro prioritário: dd/mm/yyyy
+                      // Verifica se o primeiro valor é maior que 12 → é dia
+                      if (v0 > 12) {
+                        day = v0;
+                        month = v1 - 1;
+                        year = v2;
+                      } else if (v1 > 12) {
+                        // Se o segundo valor for maior que 12, então é dia, e o primeiro é mês (formato americano)
                         month = v0 - 1;
                         day = v1;
                         year = v2;
                       } else {
-                        // Caso contrário, assume D/M/Y (formato brasileiro/padrão)
+                        // Se ambos forem <=12, assume formato brasileiro dd/mm/yyyy
                         day = v0;
                         month = v1 - 1;
                         year = v2;
@@ -694,7 +700,11 @@ export default function ServicesPage() {
 
                 const num = Number(serial);
                 if (isNaN(num)) return new Date();
-                return new Date(Math.round((num - 25569) * 86400 * 1000));
+                // Convert Excel serial date to JS Date (UTC to local)
+                const utcDays = num - 25569;
+                const utcMillis = utcDays * 86400 * 1000;
+                const dateInfo = new Date(utcMillis);
+                return new Date(dateInfo.getUTCFullYear(), dateInfo.getUTCMonth(), dateInfo.getUTCDate());
               };
 
               const parseTime = (s: any) => {
