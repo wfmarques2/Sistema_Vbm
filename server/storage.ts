@@ -201,11 +201,11 @@ export class DatabaseStorage implements IStorage {
     return vehicle;
   }
   async createVehicle(insertVehicle: InsertVehicle): Promise<Vehicle> {
-    const [vehicle] = await db.insert(vehicles).values(insertVehicle).returning();
+    const [vehicle] = await db.insert(vehicles).values(insertVehicle as any).returning();
     return vehicle;
   }
   async updateVehicle(id: number, updates: Partial<InsertVehicle>): Promise<Vehicle> {
-    const [updated] = await db.update(vehicles).set(updates).where(eq(vehicles.id, id)).returning();
+    const [updated] = await db.update(vehicles).set(updates as any).where(eq(vehicles.id, id)).returning();
     return updated;
   }
   async deleteVehicle(id: number): Promise<void> {
@@ -226,6 +226,7 @@ export class DatabaseStorage implements IStorage {
     paymentMethod?: string,
     limit?: number,
     offset?: number,
+    onlyDriverPayments?: boolean,
   }): Promise<ServiceWithDetails[]> {
     let query = db.select({
       id: services.id,
@@ -396,6 +397,9 @@ export class DatabaseStorage implements IStorage {
       valorCobrado: services.valorCobrado,
       formaPagamento: services.formaPagamento,
       statusPagamento: services.statusPagamento,
+      driverPaymentDate: services.driverPaymentDate,
+      driverPaymentCents: services.driverPaymentCents,
+      driverPaymentStatus: services.driverPaymentStatus,
       hasReturn: services.hasReturn,
       returnDateTime: services.returnDateTime,
       returnOrigin: services.returnOrigin,

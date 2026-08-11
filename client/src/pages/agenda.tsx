@@ -283,10 +283,11 @@ export default function AgendaPage() {
   }
 
   const typeLabel = (t: string) =>
-    t === "airport" ? "Aeroporto" :
-    t === "corporate" ? "Corporativo" :
-    t === "city_tour" ? "Passeio na cidade" :
-    t === "hourly" ? "Por hora" : t;
+    t === "mozio" ? "Mozio" :
+    t === "vbm" ? "VBM" :
+    t === "vbm_g" ? "VBM/G" :
+    t === "vbm_i" ? "VBM/I" :
+    t === "vbm_p" ? "VBM/P" : t;
 
   const statusLabel = (s: string) =>
     s === "scheduled" ? "Agendado" :

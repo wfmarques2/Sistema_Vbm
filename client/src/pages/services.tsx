@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/table";
 import { format, addDays, startOfDay, endOfDay } from "date-fns";
 import { es, ptBR } from "date-fns/locale";
-import { Plus, Search, Filter, Pencil, Trash2, ChevronDown, DollarSign, MoreHorizontal, Download, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Search, Filter, Pencil, Trash2, ChevronDown, DollarSign, MoreHorizontal, Download, Calendar as CalendarIcon, Clock, CheckCircle2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import React from "react";
@@ -74,6 +74,7 @@ export default function ServicesPage() {
   const [filterVehicleId, setFilterVehicleId] = useState<number | "">("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterMonth, setFilterMonth] = useState<string>("all");
+  const [upcomingMode, setUpcomingMode] = useState<boolean>(false);
   const pageSize = 20;
   const [page, setPage] = useState(0);
   const enabled = true;
@@ -167,7 +168,7 @@ export default function ServicesPage() {
       origin: "",
       destination: "",
       dateTime: new Date(),
-      type: "airport",
+      type: "vbm",
       value: "0.00",
       paymentMethod: "pix",
       status: "scheduled",
@@ -216,6 +217,7 @@ export default function ServicesPage() {
     if (params.get("driverId")) setFilterDriverId(Number(params.get("driverId")!));
     if (params.get("vehicleId")) setFilterVehicleId(Number(params.get("vehicleId")!));
     if (params.get("showFilters")) setShowFilters(true);
+    if (params.get("upcoming") === "1") setUpcomingMode(true);
     if (params.get("page")) setPage(Number(params.get("page")!));
     
     setInitializedFromQuery(true);
@@ -241,6 +243,7 @@ export default function ServicesPage() {
     if (typeof filterDriverId === "number") params.set("driverId", String(filterDriverId)); else params.delete("driverId");
     if (typeof filterVehicleId === "number") params.set("vehicleId", String(filterVehicleId)); else params.delete("vehicleId");
     if (showFilters) params.set("showFilters", "true"); else params.delete("showFilters");
+    if (upcomingMode) params.set("upcoming", "1"); else params.delete("upcoming");
     if (page > 0) params.set("page", String(page)); else params.delete("page");
     
     // Build new location with updated params
@@ -266,6 +269,7 @@ export default function ServicesPage() {
     filterDriverId, 
     filterVehicleId, 
     showFilters, 
+    upcomingMode,
     page,
     setLocation
   ]);
@@ -427,9 +431,17 @@ export default function ServicesPage() {
     return matchesText;
   });
   const displayServices = useMemo(() => {
-    const rows = filteredServices || [];
-    return [...rows].sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
-  }, [filteredServices]);
+    let rows = filteredServices || [];
+    if (upcomingMode) {
+      const todayStart = startOfDay(new Date()).getTime();
+      rows = rows.filter((s) => new Date(s.dateTime).getTime() >= todayStart);
+    }
+    return [...rows].sort((a, b) => {
+      const ta = new Date(a.dateTime).getTime();
+      const tb = new Date(b.dateTime).getTime();
+      return upcomingMode ? ta - tb : tb - ta;
+    });
+  }, [filteredServices, upcomingMode]);
   const servicesById = useMemo(() => {
     const map = new Map<number, any>();
     for (const s of filteredServices || []) {
@@ -529,10 +541,11 @@ export default function ServicesPage() {
   };
 
   const typeLabel = (t: string) =>
-    t === "corporate" ? "Executivo" :
-    t === "airport" ? "Privativo" :
-    t === "city_tour" ? "Privativo" :
-    t === "hourly" ? "Privativo" : t;
+    t === "mozio" ? "Mozio" :
+    t === "vbm" ? "VBM" :
+    t === "vbm_g" ? "VBM/G" :
+    t === "vbm_i" ? "VBM/I" :
+    t === "vbm_p" ? "VBM/P" : t;
 
   const paymentLabel = (p: string) =>
     p === "pix" ? "PIX" :
@@ -895,7 +908,7 @@ export default function ServicesPage() {
                     dateTime: dt,
                     origin,
                     destination,
-                    type: "airport",
+                    type: "mozio",
                     clientName,
                     clientPhone: telefoneStr || "-",
                     clientId: null,
@@ -1107,12 +1120,45 @@ export default function ServicesPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
+            <Button
+              variant={upcomingMode ? "default" : "outline"}
+              className={`gap-2 ${upcomingMode ? "bg-primary text-primary-foreground shadow-md" : ""}`}
+              onClick={() => {
+                if (!upcomingMode) {
+                  const today = startOfDay(new Date());
+                  setStart(toDateInput(today));
+                  setEnd("");
+                  setFilterMonth("all");
+                  setPage(0);
+                  setUpcomingMode(true);
+                } else {
+                  setUpcomingMode(false);
+                  setStart("");
+                  setEnd("");
+                  setFilterMonth("all");
+                  setPage(0);
+                }
+              }}
+            >
+              {upcomingMode ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  Próximos Atendimentos
+                </>
+              ) : (
+                <>
+                  <Clock className="w-4 h-4" />
+                  Próximos Atendimentos
+                </>
+              )}
+            </Button>
             <div className="min-w-40">
               <Select
                 value={filterMonth}
                 onValueChange={(v) => {
                   setFilterMonth(v);
+                  setUpcomingMode(false);
                   if (v === "all") {
                     setStart("");
                     setEnd("");
@@ -1152,15 +1198,12 @@ export default function ServicesPage() {
                   selected={start ? new Date(start + "T00:00:00") : undefined}
                   onSelect={(date) => {
                     if (date) {
-                      // Use the existing toDateInput function to get YYYY-MM-DD local date
                       const selectedDate = toDateInput(date);
                       setStart(selectedDate);
-                      
-                      // Calculate next day using date-fns addDays to avoid timezone issues
                       const nextDate = addDays(date, 1);
                       setEnd(toDateInput(nextDate));
-                      
                       setFilterMonth("all");
+                      setUpcomingMode(false);
                       setPage(0);
                     }
                   }}
@@ -1169,14 +1212,12 @@ export default function ServicesPage() {
                 />
               </PopoverContent>
             </Popover>
-            {(start || end) && (
+            {(start || end || upcomingMode) && (
               <Button 
                 variant="ghost" 
                 className="gap-2"
                 onClick={() => {
-                  // Navigate to clean /services page
                   setLocation("/services");
-                  // Also reset the state to make sure everything is clear
                   setStart("");
                   setEnd("");
                   setFilterMonth("all");
@@ -1188,12 +1229,13 @@ export default function ServicesPage() {
                   setFilterDriverId("");
                   setFilterVehicleId("");
                   setShowFilters(false);
+                  setUpcomingMode(false);
                 }}
               >
                 Limpar
               </Button>
             )}
-            <Button variant="outline" className="gap-2" onClick={() => setShowFilters((v) => !v)}>
+            <Button variant="outline" className="gap-2" onClick={() => { setShowFilters((v) => !v); }}>
               <Filter className="w-4 h-4" />
               {showFilters ? "Ocultar filtros" : "Filtros"}
             </Button>
@@ -1213,6 +1255,7 @@ export default function ServicesPage() {
                 setStart(s);
                 setEnd(e);
                 setFilterMonth("all");
+                setUpcomingMode(false);
                 setPage(0);
               }}
             />
@@ -1296,7 +1339,9 @@ export default function ServicesPage() {
             {isLoading ? (
                <TableRow><TableCell colSpan={11} className="text-center py-8">{t("services.loading")}</TableCell></TableRow>
             ) : displayServices.length === 0 ? (
-              <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">{t("services.empty")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                {upcomingMode ? "Nenhum atendimento agendado de hoje em diante." : t("services.empty")}
+              </TableCell></TableRow>
             ) : (
               displayServices.map((service) => {
                 const linkedReturns = returnServicesByParent.get(Number(service.id)) || [];
@@ -1534,7 +1579,9 @@ export default function ServicesPage() {
           {isLoading ? (
             <div className="text-center py-8">{t("services.loading")}</div>
             ) : displayServices.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">{t("services.empty")}</div>
+            <div className="text-center py-8 text-muted-foreground">
+              {upcomingMode ? "Nenhum atendimento agendado de hoje em diante." : t("services.empty")}
+            </div>
           ) : (
             displayServices.map((service) => {
               const linkedReturns = returnServicesByParent.get(Number(service.id)) || [];

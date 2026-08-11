@@ -120,7 +120,7 @@ export default function ServiceEditPage() {
       stop4: "",
       stop5: "",
       dateTime: new Date(),
-      type: "airport",
+      type: "vbm",
       value: "0.00",
       paymentMethod: "pix",
       status: "scheduled",
@@ -737,8 +737,11 @@ export default function ServiceEditPage() {
                     <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="corporate">Executivo</SelectItem>
-                        <SelectItem value="airport">Privativo</SelectItem>
+                        <SelectItem value="mozio">Mozio</SelectItem>
+                        <SelectItem value="vbm">VBM</SelectItem>
+                        <SelectItem value="vbm_g">VBM/G</SelectItem>
+                        <SelectItem value="vbm_i">VBM/I</SelectItem>
+                        <SelectItem value="vbm_p">VBM/P</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Phone, Mail, Users, FileText, Download, MoreHorizontal } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Mail, Users, FileText, Download, MoreHorizontal, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -48,6 +48,20 @@ export default function ClientsPage() {
   const updateMutation = useUpdateClient();
   const deleteMutation = useDeleteClient();
   const [saldoDisplay, setSaldoDisplay] = useState("R$ 0,00");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredClients = useMemo(() => {
+    if (!clients || !searchTerm.trim()) return clients;
+    const term = searchTerm.trim().toLowerCase();
+    const termDigits = term.replace(/\D/g, "");
+    return clients.filter((client: any) => {
+      const nameMatch = String(client.name || "").toLowerCase().includes(term);
+      const phoneRaw = String(client.phone || "");
+      const phoneDigits = phoneRaw.replace(/\D/g, "");
+      const phoneMatch = phoneRaw.toLowerCase().includes(term) || (termDigits && phoneDigits.includes(termDigits));
+      return nameMatch || phoneMatch;
+    });
+  }, [clients, searchTerm]);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -248,6 +262,34 @@ export default function ClientsPage() {
         </Dialog>
       </div>
 
+      <div className="mb-4">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            type="text"
+            placeholder="Buscar por nome ou telefone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 pr-10 bg-card"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Limpar busca"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        {searchTerm && filteredClients && (
+          <p className="text-xs text-muted-foreground mt-2">
+            {filteredClients.length} {filteredClients.length === 1 ? "resultado encontrado" : "resultados encontrados"}
+          </p>
+        )}
+      </div>
+
       <div className="bg-card rounded-xl shadow-sm border border-border">
         <Table>
           <TableHeader>
@@ -264,11 +306,13 @@ export default function ClientsPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-               <TableRow><TableCell colSpan={7} className="text-center py-8">{t("clients.loading")}</TableCell></TableRow>
-            ) : clients?.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">{t("clients.empty")}</TableCell></TableRow>
+               <TableRow><TableCell colSpan={8} className="text-center py-8">{t("clients.loading")}</TableCell></TableRow>
+            ) : filteredClients?.length === 0 ? (
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                {searchTerm ? "Nenhum cliente encontrado para a busca." : t("clients.empty")}
+              </TableCell></TableRow>
             ) : (
-              clients?.map((client) => (
+              filteredClients?.map((client) => (
                 <TableRow key={client.id} className="group hover:bg-muted/30 transition-colors">
                   <TableCell className="font-medium">{client.name}</TableCell>
                   <TableCell>

@@ -5,7 +5,6 @@ import { useRoute } from "wouter";
 import { format } from "date-fns";
 import { api } from "@shared/routes";
 import vbmLogoUrl from "@assets/vbm-logo-2.png?url";
-import privativoIconUrl from "@assets/privativo.png?url";
 import executivoIconUrl from "@assets/executivo.png?url";
 import paxIconUrl from "@assets/pax_icon.png?url";
 import malaIconUrl from "@assets/mala_icon.png?url";
@@ -35,8 +34,11 @@ const translations = {
     atSight: "À vista",
     phone: "Tel.",
     legend: "Legenda:",
-    private: "Privativo",
-    executive: "Executivo",
+    mozio: "Mozio",
+    vbm: "VBM",
+    vbmG: "VBM/G",
+    vbmI: "VBM/I",
+    vbmP: "VBM/P",
     totalToCollect: "TOTAL A RECOLHER",
     total: "TOTAL",
     observations: "Observações:",
@@ -67,8 +69,11 @@ const translations = {
     atSight: "Al contado",
     phone: "Tel.",
     legend: "Leyenda:",
-    private: "Privado",
-    executive: "Ejecutivo",
+    mozio: "Mozio",
+    vbm: "VBM",
+    vbmG: "VBM/G",
+    vbmI: "VBM/I",
+    vbmP: "VBM/P",
     totalToCollect: "TOTAL A RECOGER",
     total: "TOTAL",
     observations: "Observaciones:",
@@ -399,17 +404,22 @@ export default function ServiceVoucherPage() {
                 <div className="grid grid-cols-[110px_1fr]">
                   <div className="px-2 py-1 border-r text-neutral-600 cell">T</div>
                   <div className="px-2 py-1 cell">
-                    {service.type === "corporate" ? (
-                      <div className="inline-flex items-center gap-2" title={t.executive}>
-                        <img src={executivoIconUrl} alt={t.executive} className="w-4 h-4 object-contain border border-neutral-100 rounded bg-neutral-50/50" />
-                        <span>{t.executive}</span>
-                      </div>
-                    ) : (
-                      <div className="inline-flex items-center gap-2" title={t.private}>
-                        <img src={privativoIconUrl} alt={t.private} className="w-4 h-4 object-contain border border-red-100 rounded bg-red-50/50" />
-                        <span>{t.private}</span>
-                      </div>
-                    )}
+                    {(() => {
+                      const map: Record<string, string> = {
+                        mozio: t.mozio,
+                        vbm: t.vbm,
+                        vbm_g: t.vbmG,
+                        vbm_i: t.vbmI,
+                        vbm_p: t.vbmP,
+                      };
+                      const label = map[service.type] || service.type || t.vbm;
+                      return (
+                        <div className="inline-flex items-center gap-2" title={label}>
+                          <img src={executivoIconUrl} alt={label} className="w-4 h-4 object-contain border border-neutral-100 rounded bg-neutral-50/50" />
+                          <span>{label}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div className="grid grid-cols-[110px_1fr]">
@@ -475,19 +485,37 @@ export default function ServiceVoucherPage() {
                 </div>
               </div>
               <div className="flex justify-between items-center text-[12px] mt-2">
-                <div className="flex gap-6 items-center">
+                <div className="flex gap-6 items-center flex-wrap">
                   <div className="font-semibold mr-1 text-neutral-600">{t.legend}</div>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-5 h-5 flex items-center justify-center border border-red-100 rounded bg-red-50/50">
-                      <img src={privativoIconUrl} alt={t.private} className="w-3.5 h-3.5 object-contain" />
+                    <div className="w-5 h-5 flex items-center justify-center border border-neutral-100 rounded bg-neutral-50/50">
+                      <img src={executivoIconUrl} alt={t.mozio} className="w-3.5 h-3.5 object-contain" />
                     </div>
-                    <span>{t.private}</span>
+                    <span>{t.mozio}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <div className="w-5 h-5 flex items-center justify-center border border-neutral-100 rounded bg-neutral-50/50">
-                      <img src={executivoIconUrl} alt={t.executive} className="w-3.5 h-3.5 object-contain" />
+                      <img src={executivoIconUrl} alt={t.vbm} className="w-3.5 h-3.5 object-contain" />
                     </div>
-                    <span>{t.executive}</span>
+                    <span>{t.vbm}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-5 flex items-center justify-center border border-neutral-100 rounded bg-neutral-50/50">
+                      <img src={executivoIconUrl} alt={t.vbmG} className="w-3.5 h-3.5 object-contain" />
+                    </div>
+                    <span>{t.vbmG}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-5 flex items-center justify-center border border-neutral-100 rounded bg-neutral-50/50">
+                      <img src={executivoIconUrl} alt={t.vbmI} className="w-3.5 h-3.5 object-contain" />
+                    </div>
+                    <span>{t.vbmI}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-5 flex items-center justify-center border border-neutral-100 rounded bg-neutral-50/50">
+                      <img src={executivoIconUrl} alt={t.vbmP} className="w-3.5 h-3.5 object-contain" />
+                    </div>
+                    <span>{t.vbmP}</span>
                   </div>
                 </div>
                 <div className="font-medium flex items-center gap-2">

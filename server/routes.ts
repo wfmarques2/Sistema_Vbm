@@ -6,8 +6,8 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 import { seedDatabase } from "./seed";
 import { db } from "./db";
-import { users, localAuth, userInvitations, profiles, insertUserInvitationSchema, adminCreateUserSchema, registerPasswordSchema, services, vehicles, vehicleExpenses, companyExpenses, driverPayments, paymentMethodEnum, paymentStatusEnum, vehicleKmLogs, companyRevenues, clients, drivers, driverPushTokens } from "@shared/schema";
-import { eq, and, or, sql, gte, lt, asc, desc, inArray } from "drizzle-orm";
+import { users, localAuth, userInvitations, profiles, insertUserInvitationSchema, adminCreateUserSchema, registerPasswordSchema, services, vehicles, vehicleExpenses, companyExpenses, driverPayments, paymentMethodEnum, paymentStatusEnum, vehicleKmLogs, companyRevenues, clients, drivers, driverPushTokens, clientDependents } from "@shared/schema";
+import { eq, and, or, sql, gte, lt, asc, desc, inArray, gt } from "drizzle-orm";
 import { pbkdf2Sync, randomBytes } from "crypto";
 import { financialService } from "./services/financial";
 import { vehicleCostService } from "./services/vehicle-cost";
@@ -1424,6 +1424,7 @@ export async function registerRoutes(
         sortOrder: req.query.sortOrder,
       });
       const conditions = [];
+      conditions.push(gt(vehicleExpenses.valorCentavos, 0));
       if (input.start) conditions.push(gte(vehicleExpenses.ocorridaEm, input.start));
       if (input.end) conditions.push(lt(vehicleExpenses.ocorridaEm, input.end));
       if (input.vehicleId) conditions.push(eq(vehicleExpenses.vehicleId, input.vehicleId));
@@ -1675,6 +1676,7 @@ export async function registerRoutes(
         sortOrder: req.query.sortOrder,
       });
       const conditions = [];
+      conditions.push(gt(companyExpenses.valorCentavos, 0));
       if (input.start) conditions.push(gte(companyExpenses.ocorridaEm, input.start));
       if (input.end) conditions.push(lt(companyExpenses.ocorridaEm, input.end));
       if (input.categoria) conditions.push(eq(companyExpenses.categoria, input.categoria));
@@ -2179,7 +2181,9 @@ export async function registerRoutes(
           vehicleModel: s.vehicleModel,
           vehiclePlate: s.vehiclePlate,
         })),
-      ].sort((a, b) => {
+      ]
+      .filter((r) => Number(r.valorCentavos || 0) > 0)
+      .sort((a, b) => {
         const aDate = a.ocorridaEm ? new Date(a.ocorridaEm as any).getTime() : 0;
         const bDate = b.ocorridaEm ? new Date(b.ocorridaEm as any).getTime() : 0;
         const diff = (Number.isNaN(aDate) ? 0 : aDate) - (Number.isNaN(bDate) ? 0 : bDate);

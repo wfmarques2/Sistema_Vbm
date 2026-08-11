@@ -22,7 +22,7 @@ export const session = pgTable(
 export const driverTypeEnum = ["fixed", "freelance"] as const;
 export const vehicleStatusEnum = ["available", "in_use", "maintenance"] as const;
 export const vehicleTypeEnum = ["sedan","suv","minivan","van","micro_onibus","onibus","blindado"] as const;
-export const serviceTypeEnum = ["airport", "corporate", "city_tour", "hourly"] as const;
+export const serviceTypeEnum = ["mozio", "vbm", "vbm_g", "vbm_i", "vbm_p"] as const;
 export const paymentMethodEnum = ["pix", "cash", "credit_card", "debit_card", "saldo", "mozio"] as const;
 export const serviceStatusEnum = ["scheduled", "driving_pickup", "pickup_location", "driving_destination", "finished", "canceled"] as const;
 // Status de pagamento para controles financeiros
