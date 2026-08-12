@@ -11,6 +11,7 @@ import malaIconUrl from "@assets/mala_icon.png?url";
 import { ptBR, es } from "date-fns/locale";
 import { useDrivers } from "@/hooks/use-drivers";
 import { useVehicles } from "@/hooks/use-vehicles";
+import { serviceTypeLabel } from "@shared/schema";
 
 const translations = {
   pt: {
@@ -39,6 +40,8 @@ const translations = {
     vbmG: "VBM/G",
     vbmI: "VBM/I",
     vbmP: "VBM/P",
+    executivo: "Executivo",
+    privativo: "Privativo",
     totalToCollect: "TOTAL A RECOLHER",
     total: "TOTAL",
     observations: "Observações:",
@@ -405,14 +408,7 @@ export default function ServiceVoucherPage() {
                   <div className="px-2 py-1 border-r text-neutral-600 cell">T</div>
                   <div className="px-2 py-1 cell">
                     {(() => {
-                      const map: Record<string, string> = {
-                        mozio: t.mozio,
-                        vbm: t.vbm,
-                        vbm_g: t.vbmG,
-                        vbm_i: t.vbmI,
-                        vbm_p: t.vbmP,
-                      };
-                      const label = map[service.type] || service.type || t.vbm;
+                      const label = serviceTypeLabel(service.type);
                       return (
                         <div className="inline-flex items-center gap-2" title={label}>
                           <img src={executivoIconUrl} alt={label} className="w-4 h-4 object-contain border border-neutral-100 rounded bg-neutral-50/50" />

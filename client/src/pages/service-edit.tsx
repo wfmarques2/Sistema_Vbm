@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertServiceSchema, paymentMethodEnum, serviceStatusEnum, paymentStatusEnum } from "@shared/schema";
+import { insertServiceSchema, paymentMethodEnum, serviceStatusEnum, paymentStatusEnum, serviceTypeFormOptions, serviceTypeLabel, isLegacyServiceType } from "@shared/schema";
 import { z } from "zod";
 import { useCreateService, useDeleteService, useUpdateService } from "@/hooks/use-services";
 import { useDrivers } from "@/hooks/use-drivers";
@@ -731,22 +731,29 @@ export default function ServiceEditPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="type" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tipo</FormLabel>
-                    <Select onValueChange={field.onChange} value={String(field.value ?? "")}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="mozio">Mozio</SelectItem>
-                        <SelectItem value="vbm">VBM</SelectItem>
-                        <SelectItem value="vbm_g">VBM/G</SelectItem>
-                        <SelectItem value="vbm_i">VBM/I</SelectItem>
-                        <SelectItem value="vbm_p">VBM/P</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField control={form.control} name="type" render={({ field }) => {
+                  const rawValue = String(field.value ?? "");
+                  const isLegacy = isLegacyServiceType(rawValue);
+                  return (
+                    <FormItem>
+                      <FormLabel>Tipo</FormLabel>
+                      {isLegacy && (
+                        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mb-1">
+                          Tipo histórico: <strong>{serviceTypeLabel(rawValue)}</strong>. Para alterar, selecione um dos tipos atuais abaixo.
+                        </div>
+                      )}
+                      <Select onValueChange={field.onChange} value={isLegacy ? "" : rawValue}>
+                        <FormControl><SelectTrigger><SelectValue placeholder={isLegacy ? serviceTypeLabel(rawValue) : "Selecione o tipo"} /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {serviceTypeFormOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }} />
               </div>
               <FormField control={form.control} name="guide" render={({ field }) => (
                 <FormItem>

@@ -22,7 +22,67 @@ export const session = pgTable(
 export const driverTypeEnum = ["fixed", "freelance"] as const;
 export const vehicleStatusEnum = ["available", "in_use", "maintenance"] as const;
 export const vehicleTypeEnum = ["sedan","suv","minivan","van","micro_onibus","onibus","blindado"] as const;
-export const serviceTypeEnum = ["mozio", "vbm", "vbm_g", "vbm_i", "vbm_p"] as const;
+
+// Tipos de serviço ATUAIS — usados em novos agendamentos (opções do formulário).
+export const serviceTypeCurrentEnum = ["mozio", "vbm", "vbm_g", "vbm_i", "vbm_p"] as const;
+export type ServiceTypeCurrent = typeof serviceTypeCurrentEnum[number];
+
+// Tipos de serviço LEGADOS — NÃO aparecem como opção em novos serviços.
+// Mantidos apenas para compatibilidade com registros históricos existentes no PostgreSQL.
+// - airport  (≈ 580 registros)  => exibido como "Executivo"
+// - corporate (≈ 40 registros)   => exibido como "Privativo"
+export const serviceTypeLegacyEnum = ["airport", "corporate"] as const;
+export type ServiceTypeLegacy = typeof serviceTypeLegacyEnum[number];
+
+// Enum COMPLETO (atual + legado) — usado na coluna DB e em validações que PRECISAM
+// aceitar valores históricos (ex: retorno de SELECT, update de registros legados).
+export const serviceTypeEnum = [
+  ...serviceTypeCurrentEnum,
+  ...serviceTypeLegacyEnum,
+] as const;
+export type ServiceType = typeof serviceTypeEnum[number];
+
+// Opções de formulário para CRIAÇÃO/EDIÇÃO (só tipos atuais, NÃO inclui legados).
+// Usado no frontend nos <SelectItem> do service-edit.tsx.
+export const serviceTypeFormOptions: { value: ServiceTypeCurrent; label: string }[] = [
+  { value: "mozio",  label: "Mozio" },
+  { value: "vbm",    label: "VBM" },
+  { value: "vbm_g",  label: "VBM/G" },
+  { value: "vbm_i",  label: "VBM/I" },
+  { value: "vbm_p",  label: "VBM/P" },
+];
+
+/**
+ * Helper CENTRALIZADO de tradução valor-interno → label de apresentação.
+ * Reutilizar em services.tsx, agenda.tsx, service-voucher.tsx e quaisquer
+ * outros pontos onde service.type precise ser exibido ao usuário.
+ *
+ * Valores legados são convertidos para nomenclatura amigável sem tocar no banco.
+ */
+export function serviceTypeLabel(t: string | null | undefined): string {
+  if (!t) return "-";
+  switch (t) {
+    // Tipos atuais
+    case "mozio": return "Mozio";
+    case "vbm":   return "VBM";
+    case "vbm_g": return "VBM/G";
+    case "vbm_i": return "VBM/I";
+    case "vbm_p": return "VBM/P";
+    // Tipos legados (compatibilidade histórica — NÃO ALTERAR BANCO)
+    case "airport":   return "Executivo";
+    case "corporate": return "Privativo";
+    // Fallback
+    default: return String(t);
+  }
+}
+
+/**
+ * Helper que informa se um service.type é histórico (valor legado).
+ * Útil para distinguir visualmente ou emitir alertas no frontend.
+ */
+export function isLegacyServiceType(t: string | null | undefined): boolean {
+  return !!t && (t === "airport" || t === "corporate");
+}
 export const paymentMethodEnum = ["pix", "cash", "credit_card", "debit_card", "saldo", "mozio"] as const;
 export const serviceStatusEnum = ["scheduled", "driving_pickup", "pickup_location", "driving_destination", "finished", "canceled"] as const;
 // Status de pagamento para controles financeiros

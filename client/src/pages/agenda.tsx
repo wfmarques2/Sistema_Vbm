@@ -16,6 +16,7 @@ import {
 import { useUpdateService } from "@/hooks/use-services";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useI18n } from "@/lib/i18n";
+import { serviceTypeLabel } from "@shared/schema";
 
 type AgendaServiceItem = {
   key: string;
@@ -282,13 +283,6 @@ export default function AgendaPage() {
     }
   }
 
-  const typeLabel = (t: string) =>
-    t === "mozio" ? "Mozio" :
-    t === "vbm" ? "VBM" :
-    t === "vbm_g" ? "VBM/G" :
-    t === "vbm_i" ? "VBM/I" :
-    t === "vbm_p" ? "VBM/P" : t;
-
   const statusLabel = (s: string) =>
     s === "scheduled" ? "Agendado" :
     s === "driving_pickup" ? "Direção embarque" :
@@ -389,7 +383,7 @@ export default function AgendaPage() {
                       <div>
                         <h4 className="font-semibold text-primary">{service.clientName}</h4>
                         <p className="text-xs text-muted-foreground">
-                          {typeLabel(service.type)}{service.kind === "return" ? " • Retorno" : ""}
+                          {serviceTypeLabel(service.type)}{service.kind === "return" ? " • Retorno" : ""}
                         </p>
                       </div>
                       <div className={`px-2 py-1 rounded text-xs font-medium ${

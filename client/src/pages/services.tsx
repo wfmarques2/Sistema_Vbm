@@ -540,13 +540,6 @@ export default function ServicesPage() {
     });
   };
 
-  const typeLabel = (t: string) =>
-    t === "mozio" ? "Mozio" :
-    t === "vbm" ? "VBM" :
-    t === "vbm_g" ? "VBM/G" :
-    t === "vbm_i" ? "VBM/I" :
-    t === "vbm_p" ? "VBM/P" : t;
-
   const paymentLabel = (p: string) =>
     p === "pix" ? "PIX" :
     p === "cash" ? "Dinheiro" :
