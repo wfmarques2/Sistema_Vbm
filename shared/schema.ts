@@ -369,6 +369,12 @@ export const insertDriverPushTokenSchema = createInsertSchema(driverPushTokens).
 export const insertServiceSchema = createInsertSchema(services)
   .omit({ id: true, createdAt: true })
   .extend({
+    type: z.enum(serviceTypeEnum),
+    paymentMethod: z.enum(paymentMethodEnum),
+    status: z.enum(serviceStatusEnum).optional(),
+    formaPagamento: z.enum(paymentMethodEnum).nullable().optional(),
+    statusPagamento: z.enum(paymentStatusEnum).optional(),
+    restanteMetodo: z.enum(remainderMethodEnum).nullable().optional(),
     dateTime: z.coerce.date(),
     parentServiceId: z.coerce.number().int().optional(),
     isReturn: z.coerce.boolean().optional(),
