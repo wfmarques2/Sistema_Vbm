@@ -1149,6 +1149,58 @@ export async function registerRoutes(
           if (!normalized.clientPhone) normalized.clientPhone = c.phone;
         }
       }
+
+      // === VERIFICAÇÃO DE DUPLICIDADE (proteção DEFINTIVA no backend) ===
+      const normStr = (s: unknown) => {
+        return String(s || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+          .trim();
+      };
+
+      const dt = normalized.dateTime instanceof Date ? normalized.dateTime : new Date(String(normalized.dateTime || ""));
+      if (!Number.isNaN(dt.getTime())) {
+        const dtRounded = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), dt.getHours(), dt.getMinutes(), 0, 0);
+        const fiveMinMs = 5 * 60 * 1000;
+        const windowStart = new Date(dtRounded.getTime() - fiveMinMs);
+        const windowEnd = new Date(dtRounded.getTime() + fiveMinMs);
+
+        const inOrigin = normStr(normalized.origin);
+        const inDest = normStr(normalized.destination);
+        const inClient = normStr(normalized.clientName);
+        const inFlight = normStr(normalized.flight);
+
+        const existingSame = await db
+          .select({
+            id: services.id,
+            dateTime: services.dateTime,
+            origin: services.origin,
+            destination: services.destination,
+            clientName: services.clientName,
+            flight: services.flight,
+          })
+          .from(services)
+          .where(and(gte(services.dateTime, windowStart), lt(services.dateTime, windowEnd)));
+
+        const duplicate = existingSame.find((s) => {
+          const sOrigin = normStr(s.origin);
+          const sDest = normStr(s.destination);
+          const sClient = normStr(s.clientName);
+          const sFlight = normStr(s.flight);
+          const flightOk = inFlight && sFlight ? inFlight === sFlight : true;
+          return sOrigin === inOrigin && sDest === inDest && sClient === inClient && flightOk;
+        });
+
+        if (duplicate) {
+          return res.status(409).json({
+            message: `Serviço duplicado detectado: já existe o #${duplicate.id} com mesma data, origem, destino e cliente.`,
+            duplicateId: duplicate.id,
+          });
+        }
+      }
+
       const service = await storage.createService(normalized as typeof input);
       try {
         const methodNow = service.formaPagamento || service.paymentMethod;

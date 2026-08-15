@@ -780,9 +780,17 @@ export default function ServicesPage() {
               minDate.setDate(minDate.getDate() - 1);
               maxDate.setDate(maxDate.getDate() + 1);
 
+              // Formatar datas como YYYY-MM-DD (local) para a query do backend
+              const toDateStr = (d: Date) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, "0");
+                const day = String(d.getDate()).padStart(2, "0");
+                return `${y}-${m}-${day}`;
+              };
+
               let existingServices: any[] = [];
               try {
-                const res = await fetch(`/api/services?start=${minDate.toISOString()}&end=${maxDate.toISOString()}`, { credentials: "include" });
+                const res = await fetch(`/api/services?start=${toDateStr(minDate)}&end=${toDateStr(maxDate)}`, { credentials: "include" });
                 if (res.ok) {
                   existingServices = await res.json();
                 }
@@ -878,21 +886,48 @@ export default function ServicesPage() {
                 if (!destination) errors.push("Destino vazio");
                 
                 const clientName = clienteStr || "Importado XLSX";
+
+                // Normalização forte para comparação de strings (remove acentos, espaços múltiplos, etc)
+                const normStr = (s: string) => {
+                  return String(s || "")
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toLowerCase()
+                    .replace(/\s+/g, " ")
+                    .trim();
+                };
+
+                const dtRounded = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), dt.getHours(), dt.getMinutes(), 0, 0);
+                const fiveMinMs = 5 * 60 * 1000;
                 
+                const normOrigin = normStr(origin);
+                const normDest = normStr(destination);
+                const normClient = normStr(clientName);
+                const normFlight = normStr(flight);
+
                 // Verificação de duplicidade no arquivo
-                const key = `${dt.toISOString()}|${origin}|${destination}|${clientName}`.toLowerCase();
-                if (seen.has(key)) errors.push("Duplicado no arquivo");
-                seen.add(key);
+                const keyInFile = `${dtRounded.toISOString()}|${normOrigin}|${normDest}|${normClient}|${normFlight}`;
+                if (seen.has(keyInFile)) errors.push("Duplicado no arquivo");
+                seen.add(keyInFile);
 
                 // Verificação de duplicidade no banco de dados
+                // Janela de tolerância: +/- 5 minutos (evita falsos negativos por diferenças de segundo)
                 const isDuplicateInDb = existingServices?.some((s: any) => {
+                  if (!s || !s.dateTime) return false;
                   const sDt = new Date(s.dateTime);
-                  return (
-                    sDt.getTime() === dt.getTime() &&
-                    s.origin.toLowerCase().trim() === origin.toLowerCase().trim() &&
-                    s.destination.toLowerCase().trim() === destination.toLowerCase().trim() &&
-                    s.clientName.toLowerCase().trim() === clientName.toLowerCase().trim()
-                  );
+                  const sDtRounded = new Date(sDt.getFullYear(), sDt.getMonth(), sDt.getDate(), sDt.getHours(), sDt.getMinutes(), 0, 0);
+                  const timeDiffMs = Math.abs(sDtRounded.getTime() - dtRounded.getTime());
+                  const sameTimeWindow = timeDiffMs <= fiveMinMs;
+
+                  const sameOrigin = normStr(s.origin) === normOrigin;
+                  const sameDestination = normStr(s.destination) === normDest;
+                  const sameClient = normStr(s.clientName) === normClient;
+                  
+                  // Se tem voo em ambos, comparar também voo para ser mais preciso
+                  const sFlight = normStr(s.flight || "");
+                  const flightMatches = normFlight && sFlight ? normFlight === sFlight : true;
+
+                  return sameTimeWindow && sameOrigin && sameDestination && sameClient && flightMatches;
                 });
                 if (isDuplicateInDb) errors.push("Já existe no sistema");
 
