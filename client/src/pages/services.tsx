@@ -1785,7 +1785,7 @@ export default function ServicesPage() {
         </div>
       </div>
       <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-[min(95vw,1100px)] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Importar Agendamentos (.xlsx)</DialogTitle>
           </DialogHeader>
@@ -1794,32 +1794,40 @@ export default function ServicesPage() {
             • Válidas: <span className="font-medium">{importRows.filter((r: any) => (r.errors || []).length === 0).length}</span>{" "}
             • Com erros: <span className="font-medium">{importRows.filter((r: any) => (r.errors || []).length > 0).length}</span>
           </div>
-          <div className="border rounded-md overflow-auto">
+          <div className="border rounded-md overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Data/Hora</TableHead>
-                  <TableHead>Origem</TableHead>
-                  <TableHead>Destino</TableHead>
-                  <TableHead>Pax</TableHead>
-                  <TableHead>Modelo</TableHead>
-                  <TableHead>Voo</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Erros</TableHead>
+                  <TableHead className="w-[150px] shrink-0">Data/Hora</TableHead>
+                  <TableHead className="min-w-0">Origem</TableHead>
+                  <TableHead className="min-w-0">Destino</TableHead>
+                  <TableHead className="w-[60px] shrink-0 text-center">Pax</TableHead>
+                  <TableHead className="w-[80px] shrink-0">Voo</TableHead>
+                  <TableHead className="w-[100px] shrink-0">Status</TableHead>
+                  <TableHead className="min-w-[200px]">Erros</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {importRows.slice(0, 10).map((r: any, i: number) => (
                   <TableRow key={i}>
-                    <TableCell>{format(new Date(r.payload.dateTime), "dd/MM/yyyy HH:mm")}</TableCell>
-                    <TableCell className="max-w-[200px] truncate" title={r.payload.origin}>{r.payload.origin}</TableCell>
-                    <TableCell className="max-w-[200px] truncate" title={r.payload.destination}>{r.payload.destination}</TableCell>
-                    <TableCell>{r.payload.passengers}</TableCell>
-                    <TableCell>{r.payload.carModel}</TableCell>
-                    <TableCell>{r.payload.flight}</TableCell>
-                    <TableCell>{statusLabel(r.payload.status)}</TableCell>
-                    <TableCell className="text-destructive text-xs">
-                      {(r.errors || []).join("; ")}
+                    <TableCell className="whitespace-nowrap font-medium">
+                      {format(new Date(r.payload.dateTime), "dd/MM/yyyy HH:mm")}
+                    </TableCell>
+                    <TableCell className="min-w-0">
+                      <div className="whitespace-normal break-words text-sm" title={r.payload.origin}>
+                        {r.payload.origin}
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-0">
+                      <div className="whitespace-normal break-words text-sm" title={r.payload.destination}>
+                        {r.payload.destination}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center font-medium">{r.payload.passengers}</TableCell>
+                    <TableCell className="whitespace-nowrap font-mono text-sm">{r.payload.flight}</TableCell>
+                    <TableCell className="whitespace-nowrap">{statusLabel(r.payload.status)}</TableCell>
+                    <TableCell className="text-destructive text-xs whitespace-normal break-words">
+                      {(r.errors || []).length > 0 ? (r.errors || []).join("; ") : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                   </TableRow>
                 ))}
